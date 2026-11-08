@@ -1,10 +1,10 @@
 {
   "key": "a0c38a2cffbd0138ac22be9c21ef06329906a788a1c2f74be34f71b34e4564a3",
   "source": "scripted-fixture",
-  "recorded_at": "2026-11-08T00:31:44.270Z",
+  "recorded_at": "2026-11-08T00:50:33.583Z",
   "response": {
     "stop_reason": "tool_use",
-    "model": "claude-sonnet-5-5",
+    "model": "scripted-fixture",
     "content": [
       {
         "type": "tool_use",

@@ -86,7 +86,7 @@ describe("drafting", () => {
     const { res, html } = await draftFor(server);
     expect(res.status).toBe(200);
     expect(html).toContain("CONTEST");
-    expect(html).toContain("Replayed");
+    expect(html).toContain("Scripted demo fixture");
     expect(html).toContain("get_tracking");
     expect(html).toContain("Required evidence present");
     expect(html).toContain('data-score="100"');

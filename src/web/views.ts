@@ -75,7 +75,7 @@ export interface LayoutOptions {
 export function layout(opts: LayoutOptions, body: Safe): string {
   const clockNote =
     opts.mode === "mock"
-      ? h`<span class="demo-clock" title="Mock mode uses a fixed demo clock so recorded responses stay valid">Demo clock ${dateTimeFmt(opts.now.toISOString())}</span>`
+      ? h`<span class="demo-clock" title="Mock mode uses a fixed demo clock so scripted fixtures stay valid">Demo clock ${dateTimeFmt(opts.now.toISOString())}</span>`
       : "";
   return h`<!doctype html>
 <html lang="en">
@@ -284,7 +284,7 @@ export function draftPanel(
   const recClass = d.recommendation.toLowerCase();
   const sourceChip =
     draft.source === "replayed"
-      ? h`<span class="chip violet plain" title="Recorded model response replayed from fixtures/llm-cache">Replayed recording</span>`
+      ? h`<span class="chip violet plain" title="A pre-scripted draft from fixtures/llm-cache. This is not real Claude output. Set ANTHROPIC_API_KEY to get a live model draft.">Scripted demo fixture</span>`
       : h`<span class="chip blue plain">Live ${draft.model}</span>`;
   return h`<div id="draft-panel" class="card">
 <form id="draft-form" hx-post="/drafts/${draft.id}/preview" hx-target="#modal-slot" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">

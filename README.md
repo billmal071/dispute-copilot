@@ -15,7 +15,11 @@ npm start
 # open http://localhost:3000
 ```
 
-Requires Node 24. With `MODE=mock` (default) everything runs offline on 13 seeded disputes. Without `ANTHROPIC_API_KEY` the agent replays recorded model responses from `fixtures/llm-cache`; the UI labels these "Replayed recording". Mock mode uses a fixed demo clock (`DEMO_NOW`) so replayed inputs stay identical.
+Requires Node 24. With `MODE=mock` (default) everything runs offline on 13 seeded disputes. Without `ANTHROPIC_API_KEY` the agent uses a scripted demo fixture from `fixtures/llm-cache`, not real Claude output; the UI labels these drafts "Scripted demo fixture". Mock mode uses a fixed demo clock (`DEMO_NOW`) so replayed inputs stay identical.
+
+## Demo fixtures vs live model
+
+The files in `fixtures/llm-cache` are scripted demo fixtures written by `scripts/build-llm-cache.ts`. A fake LLM that follows a fixed tool plan and returns hand-written drafts produced them (`source: "scripted-fixture"`), and no Claude model was called. They exist so the app, the approval flow and the score run offline with no credentials. Their drafts and the replay eval numbers say nothing about model quality. With `ANTHROPIC_API_KEY` set, the same agent loop calls `claude-sonnet-5-5`, the UI shows the live model name, and responses are recorded into the cache as `source: "anthropic"`.
 
 ## Commands
 
@@ -33,6 +37,7 @@ Requires Node 24. With `MODE=mock` (default) everything runs offline on 13 seede
 
 - `MODE=mock`: `MockPayPal` with seeded disputes, transactions, tracking and Disputes-API-like write endpoints (status rules, validation, `PayPal-Request-Id` idempotency).
 - `MODE=sandbox`: `SandboxPayPal` against `api-m.sandbox.paypal.com`. Set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` from a Merchant sandbox app with "Customer disputes" enabled. Several response shapes are unverified; see `docs/unverified.md`.
+- `HOST` (default `127.0.0.1`) and `PORT` (default 3000) control the bind address; `.env` is loaded at startup and never overrides real environment variables.
 - `ANTHROPIC_API_KEY` set: real calls to `claude-sonnet-5-5`, recorded into the cache.
 
 ## Safety model
@@ -50,7 +55,7 @@ Deterministic, 0-100, no LLM: required evidence types, delivery verified in fetc
 
 ## Known limitations
 
-- Replayed recordings are scripted fixtures, not real model output. Record real ones with an API key.
+- Cached drafts are scripted demo fixtures, not real model output. Record real ones with an API key.
 - The eval has no baseline yet, and replay numbers are not model performance.
 - No authentication; single merchant user.
 - Sandbox response mappings are untested against real PayPal.

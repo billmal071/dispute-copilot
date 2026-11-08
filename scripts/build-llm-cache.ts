@@ -30,14 +30,14 @@ function scriptedLLM(s: Scenario): LLM {
     [{ name: SUBMIT_TOOL, input: scriptedDraft(s) }],
   ];
   return {
-    label: "claude-sonnet-5-5",
-    source: "live",
+    label: "scripted-fixture",
+    source: "replayed",
     async create(req: LLMRequest): Promise<LLMResponse> {
       const turn = req.messages.filter((m) => m.role === "assistant").length;
       const step = plan[Math.min(turn, plan.length - 1)] ?? [];
       return {
         stop_reason: "tool_use",
-        model: "claude-sonnet-5-5",
+        model: "scripted-fixture",
         content: step.map((call, i) => ({
           type: "tool_use" as const,
           id: `toolu_scripted_${turn}_${i}`,
