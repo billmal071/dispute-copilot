@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -20,6 +20,8 @@ import { PayPalError } from "./paypal/client.js";
 import { syncDisputes } from "./sync.js";
 import type { Dispute, EvidenceDraft } from "./types.js";
 import { h } from "./web/html.js";
+import { icon } from "./web/icons.js";
+import { type PageMeta, pageMeta, type RouteKey } from "./web/insight.js";
 import {
   auditPage,
   type Decision,
@@ -40,6 +42,16 @@ import { handleWebhook } from "./webhook.js";
 const ROOT = join(import.meta.dirname, "..");
 const DECIDER = "merchant@local";
 const CSRF_FIELD = "csrf_token";
+
+const STATIC_FILES: [route: string, file: string, type: string][] = [
+  ["/favicon.svg", "icons/favicon.svg", "image/svg+xml"],
+  ["/favicon.ico", "icons/favicon.ico", "image/x-icon"],
+  ["/apple-touch-icon.png", "icons/apple-touch-icon.png", "image/png"],
+  ["/icon-192.png", "icons/icon-192.png", "image/png"],
+  ["/icon-512.png", "icons/icon-512.png", "image/png"],
+  ["/assets/grain.png", "icons/grain.png", "image/png"],
+  ["/manifest.webmanifest", "manifest.webmanifest", "application/manifest+json"],
+];
 
 const readAsset = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
@@ -140,10 +152,22 @@ export function createServer(ctx: AppContext): Server {
   const csrf = csrfGuard(randomBytes(32));
   const page = (
     c: { get(key: "csrf"): string },
-    title: string,
+    meta: PageMeta | RouteKey,
     nav: "inbox" | "audit" | "",
     body: ReturnType<typeof h>,
-  ) => layout({ title, mode: ctx.mode, nav, now: ctx.clock.now(), csrf: c.get("csrf") }, body);
+    id?: string,
+  ) =>
+    layout(
+      {
+        meta: typeof meta === "string" ? pageMeta(meta, id ? { id } : {}) : meta,
+        mode: ctx.mode,
+        nav,
+        now: ctx.clock.now(),
+        csrf: c.get("csrf"),
+      },
+      body,
+    );
+  const auditFor = (disputeId: string) => listAudit(ctx.db, disputeId).slice(-3);
 
   app.use("*", async (c, next) => {
     const existing = getCookie(c, CSRF_COOKIE);
@@ -189,8 +213,30 @@ export function createServer(ctx: AppContext): Server {
   });
   app.get("/assets/app.css", (c) => {
     c.header("content-type", "text/css; charset=utf-8");
+    c.header("cache-control", "no-cache");
     return c.body(readAsset("public/app.css"));
   });
+  app.get("/assets/app.js", (c) => {
+    c.header("content-type", "text/javascript; charset=utf-8");
+    c.header("cache-control", "no-cache");
+    return c.body(readAsset("public/app.js"));
+  });
+  app.get("/assets/fonts/:file", (c) => {
+    const file = c.req.param("file");
+    if (!/^[a-z0-9-]+\.woff2$/.test(file)) return c.notFound();
+    const path = join(ROOT, "public", "fonts", file);
+    if (!existsSync(path)) return c.notFound();
+    c.header("content-type", "font/woff2");
+    c.header("cache-control", "public, max-age=31536000, immutable");
+    return c.body(readFileSync(path));
+  });
+  for (const [route, file, type] of STATIC_FILES) {
+    app.get(route, (c) => {
+      c.header("content-type", type);
+      c.header("cache-control", "public, max-age=86400");
+      return c.body(readFileSync(join(ROOT, "public", file)));
+    });
+  }
   app.get("/healthz", (c) => c.json({ ok: true, mode: ctx.mode }));
 
   app.get("/", (c) => {
@@ -207,12 +253,13 @@ export function createServer(ctx: AppContext): Server {
               recommendation: draft.draft.recommendation,
               score: draft.score,
               version: draft.version,
+              offerAmount: draft.draft.offer ? Number(draft.draft.offer.amount) : null,
             }
           : null,
         decision: decision?.decision ?? null,
       };
     });
-    return c.html(page(c, "Disputes", "inbox", inboxPage(rows, ctx.clock.now(), ctx.mode)));
+    return c.html(page(c, "inbox", "inbox", inboxPage(rows, ctx.clock.now(), ctx.mode)));
   });
 
   app.post("/sync", async (c) => {
@@ -223,9 +270,13 @@ export function createServer(ctx: AppContext): Server {
       return c.html(
         page(
           c,
-          "Sync failed",
+          {
+            title: "Sync failed",
+            description:
+              "Dispute Copilot could not reach PayPal to sync disputes. Your last synced disputes, drafts and audit trail are still available.",
+          },
           "inbox",
-          h`<div class="card empty"><h2>PayPal unavailable</h2><div class="callout error" style="text-align:left">${message}</div><p class="hint" style="margin-top:8px">Showing the last synced data. Your drafts are saved.</p><a class="btn primary" href="/">Back to inbox</a></div>`,
+          h`<div class="panel empty"><h2>PayPal unavailable</h2><div class="callout error" role="alert">${icon.alert}<div>${message}</div></div><p class="hint">Showing the last synced data. Your drafts are saved.</p><a class="btn primary" href="/">Back to inbox</a></div>`,
         ),
         502,
       );
@@ -244,7 +295,7 @@ export function createServer(ctx: AppContext): Server {
         return c.html(
           page(
             c,
-            "Not found",
+            "notfound",
             "inbox",
             notFoundPage("Dispute not found", `PayPal has no dispute with id ${id}.`),
           ),
@@ -258,7 +309,7 @@ export function createServer(ctx: AppContext): Server {
       return c.html(
         page(
           c,
-          "Unavailable",
+          "error",
           "inbox",
           notFoundPage("PayPal unavailable", loadError ?? "The dispute could not be loaded."),
         ),
@@ -284,13 +335,23 @@ export function createServer(ctx: AppContext): Server {
     const panel = !draft
       ? noDraftPanel(id)
       : decision
-        ? decisionPanel(draft, decision, ctx.mode)
-        : draftPanel(draft, { mode: ctx.mode, idempotencyKey: randomUUID() });
+        ? decisionPanel(draft, decision, ctx.mode, undefined, auditFor(id))
+        : draftPanel(draft, {
+            mode: ctx.mode,
+            idempotencyKey: randomUUID(),
+            amount: dispute.dispute_amount,
+          });
     const banner = loadError
       ? h`<div class="callout warn">PayPal is unavailable (${loadError}). Showing the last synced copy of this dispute.</div>`
       : "";
     return c.html(
-      page(c, dispute.dispute_id, "inbox", h`${banner}${detailPage(view, panel, ctx.clock.now())}`),
+      page(
+        c,
+        "dispute",
+        "inbox",
+        h`${banner}${detailPage(view, panel, ctx.clock.now())}`,
+        dispute.dispute_id,
+      ),
     );
   });
 
@@ -300,7 +361,7 @@ export function createServer(ctx: AppContext): Server {
       return c.html(
         page(
           c,
-          "Not found",
+          "notfound",
           "inbox",
           notFoundPage("Dispute not found", `No synced dispute with id ${id}.`),
         ),
@@ -311,7 +372,11 @@ export function createServer(ctx: AppContext): Server {
     if (!isHtmx(c)) return c.redirect(`/disputes/${id}`, 303);
     return c.html(
       outcome.state === "ok"
-        ? draftPanel(outcome.draft, { mode: ctx.mode, idempotencyKey: randomUUID() }).toString()
+        ? draftPanel(outcome.draft, {
+            mode: ctx.mode,
+            idempotencyKey: randomUUID(),
+            amount: (localDispute(ctx, id) as Dispute).dispute_amount,
+          }).toString()
         : noDraftPanel(id, outcome.error).toString(),
     );
   });
@@ -370,7 +435,15 @@ export function createServer(ctx: AppContext): Server {
       if (!isHtmx(c)) return c.redirect(`/disputes/${stored.dispute_id}`, 303);
       const decision = loadDecision(ctx, draftId);
       if (!decision) throw new Error("decision missing after approval");
-      return c.html(decisionPanel(stored, decision, ctx.mode, outcome.error).toString());
+      return c.html(
+        decisionPanel(
+          stored,
+          decision,
+          ctx.mode,
+          outcome.error,
+          auditFor(stored.dispute_id),
+        ).toString(),
+      );
     } catch (err) {
       if (err instanceof ValidationError) {
         c.header("HX-Retarget", "#approval-error");
@@ -382,7 +455,13 @@ export function createServer(ctx: AppContext): Server {
         const decision = loadDecision(ctx, draftId);
         return c.html(
           decision
-            ? decisionPanel(stored, decision, ctx.mode).toString()
+            ? decisionPanel(
+                stored,
+                decision,
+                ctx.mode,
+                undefined,
+                auditFor(stored.dispute_id),
+              ).toString()
             : errorFragment(err.message).toString(),
           409,
         );
@@ -414,7 +493,9 @@ export function createServer(ctx: AppContext): Server {
         409,
       );
     if (!isHtmx(c)) return c.redirect(`/disputes/${stored.dispute_id}`, 303);
-    return c.html(decisionPanel(stored, decision, ctx.mode).toString());
+    return c.html(
+      decisionPanel(stored, decision, ctx.mode, undefined, auditFor(stored.dispute_id)).toString(),
+    );
   });
 
   app.post("/drafts/:id/submit", async (c) => {
@@ -433,7 +514,7 @@ export function createServer(ctx: AppContext): Server {
     return c.html(
       page(
         c,
-        "Audit trail",
+        "audit",
         "audit",
         auditPage(listAudit(ctx.db, dispute).reverse(), verifyChain(ctx.db), dispute),
       ),
@@ -466,7 +547,7 @@ export function createServer(ctx: AppContext): Server {
 
   app.notFound((c) =>
     c.html(
-      page(c, "Not found", "", notFoundPage("Page not found", "That page does not exist.")),
+      page(c, "notfound", "", notFoundPage("Page not found", "That page does not exist.")),
       404,
     ),
   );
@@ -475,7 +556,7 @@ export function createServer(ctx: AppContext): Server {
     return c.html(
       page(
         c,
-        "Error",
+        "error",
         "",
         notFoundPage(
           "Something went wrong",

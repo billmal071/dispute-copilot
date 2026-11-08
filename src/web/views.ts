@@ -4,6 +4,22 @@ import { sameAddress } from "../agent/facts.js";
 import type { AuditRow, ChainResult } from "../audit.js";
 import type { Dispute, DisputeReason, Order, ToolRun, Tracking, Transaction } from "../types.js";
 import { h, raw, type Safe } from "./html.js";
+import { icon, sealMark } from "./icons.js";
+import {
+  checklistFor,
+  deadlineRing,
+  type Fact,
+  type InboxRow,
+  outboundRequest,
+  type PageMeta,
+  type RankedRow,
+  type Ring,
+  rankRows,
+  relevantFacts,
+  winChance,
+} from "./insight.js";
+
+export type { InboxRow } from "./insight.js";
 
 export const REASON_LABEL: Record<DisputeReason, string> = {
   MERCHANDISE_OR_SERVICE_NOT_RECEIVED: "Item not received",
@@ -17,7 +33,7 @@ export const REASON_LABEL: Record<DisputeReason, string> = {
 
 const STATUS: Record<string, { label: string; tone: string }> = {
   WAITING_FOR_SELLER_RESPONSE: { label: "Waiting for you", tone: "amber" },
-  WAITING_FOR_BUYER_RESPONSE: { label: "Waiting for buyer", tone: "violet" },
+  WAITING_FOR_BUYER_RESPONSE: { label: "Waiting for buyer", tone: "gray" },
   UNDER_REVIEW: { label: "Under review", tone: "blue" },
   RESOLVED: { label: "Resolved", tone: "green" },
   OPEN: { label: "Open", tone: "gray" },
@@ -30,9 +46,14 @@ export const statusChip = (status: string): Safe => {
 };
 
 export const money = (m: { currency_code: string; value: string }): string =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: m.currency_code }).format(
-    Number(m.value),
-  );
+  formatMoney(Number(m.value), m.currency_code);
+
+const formatMoney = (value: number, currency: string, whole = false): string =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    ...(whole ? { maximumFractionDigits: 0, minimumFractionDigits: 0 } : {}),
+  }).format(value);
 
 const dateFmt = (iso: string | null | undefined) =>
   iso
@@ -56,16 +77,52 @@ export function timeLeft(due: string | null, now: Date): Safe {
   return h`<span class="${hours < 72 ? "due-warn" : ""}">${days}d left</span>`;
 }
 
-export function scoreRing(score: number, size: "sm" | "lg" = "sm"): Safe {
-  const tone = score >= 80 ? "good" : score >= 50 ? "mid" : "low";
-  return h`<div class="score ${tone} ${size === "lg" ? "lg" : ""}" style="--pct:${score}" data-score="${score}" role="img" aria-label="Evidence quality score ${score} out of 100"><span>${score}</span></div>`;
+export function deadlineRingView(ring: Ring, size: "sm" | "lg" = "sm"): Safe {
+  return h`<span class="ring ${ring.tone}" data-size="${size}" role="img" aria-label="${ring.sr}"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="ring-track" cx="22" cy="22" r="18"/><circle class="ring-fill" cx="22" cy="22" r="18" pathLength="100" stroke-dasharray="${(ring.fraction * 100).toFixed(1)} 100" transform="rotate(-90 22 22)"/></svg><b>${ring.label}</b></span>`;
+}
+
+type Tone = "strong" | "fair" | "weak";
+const toneOf = (pct: number): Tone => (pct >= 80 ? "strong" : pct >= 50 ? "fair" : "weak");
+const TONE_WORD: Record<Tone, string> = { strong: "Strong", fair: "Fair", weak: "Weak" };
+const TONE_ICON: Record<Tone, Safe> = {
+  strong: icon.checkCircle,
+  fair: icon.halfCircle,
+  weak: icon.alert,
+};
+
+const GAUGE_R = 84;
+const GAUGE_C = 2 * Math.PI * GAUGE_R;
+const GAUGE_ARC = GAUGE_C * 0.75;
+
+export function gauge(score: number, contest: boolean): Safe {
+  const pct = contest ? score : 0;
+  const tone = toneOf(pct);
+  const fill = (GAUGE_ARC * pct) / 100;
+  const tick = (at: number) => {
+    const a = ((135 + 270 * (at / 100)) * Math.PI) / 180;
+    const [x1, y1] = [100 + (GAUGE_R - 11) * Math.cos(a), 100 + (GAUGE_R - 11) * Math.sin(a)];
+    const [x2, y2] = [100 + (GAUGE_R + 11) * Math.cos(a), 100 + (GAUGE_R + 11) * Math.sin(a)];
+    return h`<line class="g-tick" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+  };
+  return h`<div class="gauge ${contest ? tone : "none"}" data-score="${score}" ${contest ? raw(`data-gauge="${score}"`) : ""} role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${contest ? `Estimated win chance ${score} percent` : "Win chance not applicable: the agent does not recommend contesting"}" style="--arc:${GAUGE_ARC.toFixed(2)};--fill:${fill.toFixed(2)}">
+  <svg viewBox="0 0 200 200" aria-hidden="true">
+    <circle class="g-track" cx="100" cy="100" r="${GAUGE_R}" stroke-dasharray="${GAUGE_ARC.toFixed(2)} ${GAUGE_C.toFixed(2)}" transform="rotate(135 100 100)"/>
+    ${contest ? h`<circle class="g-fill" cx="100" cy="100" r="${GAUGE_R}" stroke-dasharray="${fill.toFixed(2)} ${GAUGE_C.toFixed(2)}" transform="rotate(135 100 100)"/>` : ""}
+    ${tick(50)}${tick(80)}
+  </svg>
+  <div class="g-read">
+    <span class="g-num">${contest ? h`${score}<small>%</small>` : "n/a"}</span>
+    <span class="g-label">${contest ? "win chance" : "not contesting"}</span>
+  </div>
+  ${contest ? h`<span class="g-tone">${TONE_ICON[tone]}${TONE_WORD[tone]}</span>` : ""}
+</div>`;
 }
 
 const CSRF_MARKER = "__CSRF_TOKEN__";
 const csrfInput = raw(`<input type="hidden" name="csrf_token" value="${CSRF_MARKER}">`);
 
 export interface LayoutOptions {
-  title: string;
+  meta: PageMeta;
   mode: "mock" | "sandbox";
   nav: "inbox" | "audit" | "";
   now: Date;
@@ -73,83 +130,144 @@ export interface LayoutOptions {
 }
 
 export function layout(opts: LayoutOptions, body: Safe): string {
+  const { meta } = opts;
+  const fullTitle = `${meta.title} · Dispute Copilot`;
   const clockNote =
     opts.mode === "mock"
-      ? h`<span class="demo-clock" title="Mock mode uses a fixed demo clock so scripted fixtures stay valid">Demo clock ${dateTimeFmt(opts.now.toISOString())}</span>`
+      ? h`<span class="demo-clock" title="Mock mode uses a fixed demo clock so scripted fixtures stay valid"><span class="dot" aria-hidden="true"></span>Demo clock ${dateTimeFmt(opts.now.toISOString())}</span>`
       : "";
   return h`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${opts.title} · Dispute Copilot</title>
+<title>${fullTitle}</title>
+<meta name="description" content="${meta.description}">
+<meta name="theme-color" content="#f4f0e6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1114" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dispute Copilot">
+<meta property="og:title" content="${fullTitle}">
+<meta property="og:description" content="${meta.description}">
+<meta property="og:image" content="/icon-512.png">
+<meta property="og:image:alt" content="Dispute Copilot mark: an open deadline ring with a check">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${fullTitle}">
+<meta name="twitter:description" content="${meta.description}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preload" href="/assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/instrument-serif-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/app.css">
+<script>try{var t=localStorage.getItem("dc-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <script src="/assets/htmx.js" defer></script>
-<script>document.addEventListener("htmx:beforeSwap",function(e){var s=e.detail.xhr.status;if(s>=400&&s<600){e.detail.shouldSwap=true;e.detail.isError=false;}});</script>
+<script src="/assets/app.js" defer></script>
 </head>
 <body hx-boost="false" hx-headers='{"X-CSRF-Token":"${opts.csrf}"}'>
 <a class="skip" href="#main">Skip to content</a>
 <header class="topbar"><div class="topbar-inner">
-  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5L16 9.5"/></svg></span>Dispute Copilot</a>
+  <a class="brand" href="/" aria-label="Dispute Copilot, inbox">${sealMark}<span class="brand-name">Dispute Copilot</span></a>
   <nav class="nav" aria-label="Primary">
     <a href="/" ${opts.nav === "inbox" ? raw('aria-current="page"') : ""}>Inbox</a>
     <a href="/audit" ${opts.nav === "audit" ? raw('aria-current="page"') : ""}>Audit trail</a>
   </nav>
-  <div class="topbar-right">${clockNote}<span class="mode ${opts.mode}">${opts.mode.toUpperCase()}</span></div>
+  <div class="topbar-right">${clockNote}<span class="mode ${opts.mode}">${opts.mode.toUpperCase()}</span>
+    <button class="icon-btn" type="button" id="theme-toggle" aria-label="Switch colour theme"><span class="show-light">${icon.moon}</span><span class="show-dark">${icon.sun}</span></button>
+  </div>
 </div></header>
 <main id="main">${body}</main>
+<footer class="foot"><div class="foot-inner"><span>${sealMark} Nothing is sent to PayPal until a person approves it.</span><span>${opts.mode === "mock" ? "Mock mode: seeded disputes, scripted demo drafts unless a model key is set." : "Sandbox mode: calls api-m.sandbox.paypal.com."}</span></div></footer>
 </body>
 </html>`
     .toString()
     .replaceAll(CSRF_MARKER, opts.csrf);
 }
 
-export interface InboxRow {
-  dispute: Dispute;
-  draft: { recommendation: string; score: number; version: number } | null;
-  decision: string | null;
+function agentState(row: InboxRow): Safe {
+  const { draft, decision } = row;
+  if (decision === "reject") return h`<span class="state done">${icon.x}Rejected</span>`;
+  if (decision) return h`<span class="state sent">${icon.send}Sent</span>`;
+  if (draft)
+    return h`<span class="state drafted">${icon.file}Drafted<span class="state-sub">${draft.recommendation.replace("_", " ")} · v${draft.version}</span></span>`;
+  return h`<span class="state none">Not drafted</span>`;
+}
+
+function winCell(r: RankedRow): Safe {
+  const { draft } = r.row;
+  if (!draft) return h`<span class="win none" title="No draft yet, so no win chance">-</span>`;
+  if (r.winChance === null)
+    return h`<span class="win text">${draft.recommendation === "ACCEPT" ? "Concede" : "Settle"}</span>`;
+  const pct = Math.round(r.winChance * 100);
+  const tone = toneOf(pct);
+  return h`<span class="win ${tone}" data-win="${pct}"><span class="win-bar" role="img" aria-label="${pct} percent win chance, ${TONE_WORD[tone]}"><i style="--w:${pct}%"></i></span><b>${pct}%</b></span>`;
+}
+
+function caseRow(r: RankedRow, now: Date): Safe {
+  const d = r.row.dispute;
+  const buyer = d.disputed_transactions[0]?.buyer.name ?? "Unknown buyer";
+  return h`<li class="case ${r.actionable ? "" : "settled"}" data-dispute-row data-id="${d.dispute_id}" style="--i:${r.rank}">
+  <span class="rank" aria-hidden="true">${String(r.rank).padStart(2, "0")}</span>
+  ${deadlineRingView(deadlineRing(d.seller_response_due_date, now))}
+  <div class="case-main">
+    <a class="case-link" href="/disputes/${d.dispute_id}">${buyer}</a>
+    <span class="case-sub"><span class="mono">${d.dispute_id}</span><span aria-hidden="true">·</span>${REASON_LABEL[d.reason]}</span>
+  </div>
+  <div class="case-amount tnum">${money(d.dispute_amount)}</div>
+  <div class="case-win">${winCell(r)}</div>
+  <div class="case-state">${agentState(r.row)}${statusChip(d.status)}</div>
+  <span class="case-go" aria-hidden="true">${icon.arrow}</span>
+</li>`;
 }
 
 export function inboxPage(rows: InboxRow[], now: Date, mode: "mock" | "sandbox"): Safe {
-  const waiting = rows.filter((r) => r.dispute.status === "WAITING_FOR_SELLER_RESPONSE").length;
-  const head = h`<div class="page-head">
-    <div><h1>Disputes</h1><p>${rows.length} synced, ${waiting} waiting for your response.</p></div>
-    <form method="post" action="/sync">${csrfInput}<button class="btn" type="submit">Sync now</button></form>
+  const head = (action: Safe | "") => h`<div class="page-head">
+    <div><span class="eyebrow">${dateFmt(now.toISOString())}</span><h1>Case docket</h1></div>
+    <div class="head-actions">${action}<form method="post" action="/sync">${csrfInput}<button class="btn ghost" type="submit">${icon.sync}Sync now</button></form></div>
   </div>`;
   if (rows.length === 0) {
-    return h`${head}<div class="card empty"><h2>No disputes yet</h2><p>Sync with ${mode === "mock" ? "the seeded mock data" : "PayPal"} to load your open disputes.</p>
+    return h`${head("")}<div class="panel empty">
+      <svg class="empty-art" viewBox="0 0 120 96" aria-hidden="true"><rect x="22" y="10" width="76" height="76" rx="8" class="ea-sheet"/><path d="M36 30h48M36 42h48M36 54h30" class="ea-line"/><circle cx="86" cy="70" r="14" class="ea-ring"/><path d="M80 70l4 4 8-9" class="ea-check"/></svg>
+      <h2>No disputes yet</h2><p>Sync with ${mode === "mock" ? "the seeded mock data" : "PayPal"} to load your open disputes.</p>
       <form method="post" action="/sync">${csrfInput}<button class="btn primary" type="submit">Sync now</button></form></div>`;
   }
-  const sorted = [...rows].sort((a, b) =>
-    (a.dispute.seller_response_due_date ?? "9").localeCompare(
-      b.dispute.seller_response_due_date ?? "9",
-    ),
-  );
-  return h`${head}
-<div class="card"><table class="table">
-<thead><tr><th>Dispute</th><th>Reason</th><th class="num">Amount</th><th>Due</th><th>Status</th><th>Draft</th><th>Score</th></tr></thead>
-<tbody>${sorted.map(({ dispute: d, draft, decision }) => {
-    const buyer = d.disputed_transactions[0]?.buyer.name ?? "Unknown buyer";
-    return h`<tr data-dispute-row>
-  <td><a class="row-link" href="/disputes/${d.dispute_id}">${d.dispute_id}</a><div class="sub">${buyer}</div></td>
-  <td>${REASON_LABEL[d.reason]}</td>
-  <td class="num">${money(d.dispute_amount)}</td>
-  <td>${timeLeft(d.seller_response_due_date, now)}</td>
-  <td>${statusChip(d.status)}</td>
-  <td>${
-    decision
-      ? h`<span class="chip plain ${decision === "reject" ? "gray" : "green"}">${decision === "reject" ? "Rejected" : "Submitted"}</span>`
-      : draft
-        ? h`<span class="chip plain violet">${draft.recommendation.replace("_", " ")} · v${draft.version}</span>`
-        : h`<span class="sub">No draft</span>`
-  }</td>
-  <td>${draft ? scoreRing(draft.score) : h`<span class="sub">-</span>`}</td>
-</tr>`;
-  })}</tbody></table></div>`;
+  const { ranked, totals } = rankRows(rows, now);
+  const currency = rows[0]?.dispute.dispute_amount.currency_code ?? "USD";
+  const open = ranked.filter((r) => r.actionable);
+  const done = ranked.filter((r) => !r.actionable);
+  const top = open[0];
+  const recoverPct =
+    totals.atStake > 0 ? Math.round((totals.recoverable / totals.atStake) * 100) : 0;
+  const next = top
+    ? h`<a class="btn primary next-case" href="/disputes/${top.row.dispute.dispute_id}">Work the next case${icon.arrow}</a>`
+    : "";
+  return h`${head(next)}
+<section class="strip" aria-label="Summary">
+  <div class="stat"><span class="stat-label">Money at stake</span><span class="stat-fig tnum">${formatMoney(totals.atStake, currency, true)}</span><span class="stat-note">${open.length} open ${open.length === 1 ? "dispute" : "disputes"} waiting for you</span></div>
+  <div class="stat"><span class="stat-label">Due within 48h</span><span class="stat-fig tnum">${totals.dueSoon}</span><span class="stat-note">${totals.dueSoon === 0 ? "Nothing urgent" : "Answer these first"}</span></div>
+  <div class="stat wide"><span class="stat-label">Est. recoverable</span><span class="stat-fig tnum">${formatMoney(totals.recoverable, currency, true)}</span>
+    <span class="meter" role="img" aria-label="${recoverPct} percent of the money at stake is estimated recoverable"><i style="--w:${recoverPct}%"></i></span>
+    <span class="stat-note">${recoverPct}% of stake. Amount times evidence score for contests${totals.unscored > 0 ? `; ${totals.unscored} not drafted yet are excluded` : ""}. An estimate, not a prediction.</span></div>
+</section>
+<section aria-labelledby="open-h">
+  <div class="list-head"><h2 id="open-h">Needs your response</h2><span class="sub">Ranked by urgency × expected value</span></div>
+  <ol class="docket">${open.map((r) => caseRow(r, now))}</ol>
+</section>
+${
+  done.length > 0
+    ? h`<section aria-labelledby="done-h" class="settled-block">
+  <div class="list-head"><h2 id="done-h">Decided or with PayPal</h2></div>
+  <ol class="docket">${done.map((r) => caseRow(r, now))}</ol></section>`
+    : ""
+}`;
 }
 
 export function notFoundPage(what: string, detail: string): Safe {
-  return h`<div class="card empty"><h2>${what}</h2><p>${detail}</p><a class="btn primary" href="/">Back to inbox</a></div>`;
+  return h`<div class="panel empty">
+  <svg class="empty-art" viewBox="0 0 120 96" aria-hidden="true"><rect x="22" y="10" width="76" height="76" rx="8" class="ea-sheet"/><path d="M36 30h48M36 42h48M36 54h30" class="ea-line"/><circle cx="86" cy="70" r="14" class="ea-ring warn"/><path d="M86 63v8M86 76v.5" class="ea-check warn"/></svg>
+  <h2>${what}</h2><p>${detail}</p><a class="btn primary" href="/">${icon.back}Back to inbox</a></div>`;
 }
 
 export interface EvidenceView {
@@ -168,58 +286,67 @@ function addressLine(
   return a ? `${a.line1}, ${a.city} ${a.postal_code}, ${a.country_code}` : "Not on file";
 }
 
-function evidencePanel(ev: EvidenceView, now: Date): Safe {
+const hl = (on: boolean, content: unknown): Safe =>
+  on ? h`<mark class="hl">${content}</mark>` : h`${content}`;
+
+function caseFile(ev: EvidenceView, now: Date): Safe {
   const d = ev.dispute;
+  const facts: Set<Fact> = relevantFacts(d.reason);
   const txn = hasError(ev.transaction) ? null : ev.transaction;
   const tracking = ev.tracking && !hasError(ev.tracking) ? ev.tracking : null;
   const match =
     txn && tracking ? sameAddress(txn.shipping_address, tracking.delivery_address) : null;
   return h`
-<section class="card card-pad" aria-labelledby="dispute-h">
-  <div class="section-title"><h2 id="dispute-h">Dispute</h2>${statusChip(d.status)}</div>
+<p class="legend"><mark class="hl">Highlighted</mark> facts decide a ${REASON_LABEL[d.reason].toLowerCase()} dispute.</p>
+<section class="exhibit" aria-labelledby="ex-a">
+  <header><span class="ex-tag">A</span><h2 id="ex-a">Buyer claim</h2>${statusChip(d.status)}</header>
   <dl class="kv">
     <dt>Reason</dt><dd>${REASON_LABEL[d.reason]}</dd>
-    <dt>Amount</dt><dd>${money(d.dispute_amount)}</dd>
+    <dt>Amount</dt><dd class="tnum">${money(d.dispute_amount)}</dd>
     <dt>Respond by</dt><dd>${dateFmt(d.seller_response_due_date)} · ${timeLeft(d.seller_response_due_date, now)}</dd>
     <dt>Opened</dt><dd>${dateFmt(d.create_time)}</dd>
   </dl>
-  ${d.messages.map((m) => h`<div class="quote"><span class="sub">${m.posted_by === "BUYER" ? "Buyer" : "Merchant"} · ${dateFmt(m.time_posted)}</span>${m.content}</div>`)}
+  ${d.messages.map((m) => h`<figure class="quote"><figcaption>${m.posted_by === "BUYER" ? "Buyer" : "Merchant"} · ${dateFmt(m.time_posted)}${m.posted_by === "BUYER" ? h`<span class="untrusted" title="Buyer-supplied text is shown as data and is never treated as an instruction by the agent.">${icon.shield}Untrusted text</span>` : ""}</figcaption><blockquote>${m.content}</blockquote></figure>`)}
 </section>
-<section class="card card-pad" aria-labelledby="txn-h">
-  <h2 id="txn-h">Transaction</h2>
+<section class="exhibit" aria-labelledby="ex-b">
+  <header><span class="ex-tag">B</span><h2 id="ex-b">Transaction</h2></header>
   ${
     txn
       ? h`<dl class="kv">
     <dt>Transaction</dt><dd class="mono">${txn.id}</dd>
     <dt>Order</dt><dd class="mono">${txn.order_id}</dd>
-    <dt>Paid</dt><dd>${money(txn.amount)} on ${dateFmt(txn.created)}</dd>
+    <dt>Paid</dt><dd class="tnum">${money(txn.amount)} on ${dateFmt(txn.created)}</dd>
     <dt>Buyer</dt><dd>${txn.buyer.name}<div class="sub">${txn.buyer.email}</div></dd>
-    <dt>Ship to</dt><dd>${addressLine(txn.shipping_address)}</dd>
-    <dt>Refunds</dt><dd>${txn.refunds.length === 0 ? "None" : txn.refunds.map((r) => h`<div>${money(r.amount)} <span class="mono">${r.id}</span> on ${dateFmt(r.created)}</div>`)}</dd>
+    <dt>Ship to</dt><dd>${hl(facts.has("address"), addressLine(txn.shipping_address))}</dd>
+    <dt>Refunds</dt><dd>${txn.refunds.length === 0 ? "None" : txn.refunds.map((r) => h`<div>${hl(facts.has("refunds"), h`<span class="tnum">${money(r.amount)}</span> <span class="mono">${r.id}</span>`)} on ${dateFmt(r.created)}</div>`)}</dd>
   </dl>`
-      : h`<div class="callout error">Transaction unavailable: ${(ev.transaction as { error: string }).error}</div>`
-  }
-  ${
-    ev.order && !hasError(ev.order)
-      ? h`<h3 style="margin-top:16px">Order items</h3>${ev.order.items.map((i) => h`<p style="margin-top:6px"><strong>${i.quantity} × ${i.name}</strong><span class="sub"> · ${i.description}</span></p>`)}${ev.order.listing_note ? h`<div class="callout warn">Listing note: ${ev.order.listing_note}</div>` : ""}`
-      : ""
+      : h`<div class="callout error">${icon.alert}<div>Transaction unavailable: ${(ev.transaction as { error: string }).error}</div></div>`
   }
 </section>
-<section class="card card-pad" aria-labelledby="ship-h">
-  <h2 id="ship-h">${txn?.access_logs ? "Access logs" : "Shipping evidence"}</h2>
+${
+  ev.order && !hasError(ev.order)
+    ? h`<section class="exhibit" aria-labelledby="ex-c">
+  <header><span class="ex-tag">C</span><h2 id="ex-c">Order</h2></header>
+  <ul class="items">${ev.order.items.map((i) => h`<li><strong>${i.quantity} × ${i.name}</strong><span class="sub">${i.description}</span></li>`)}</ul>
+  ${ev.order.listing_note ? h`<div class="callout warn">${icon.flag}<div>${hl(facts.has("listing"), h`Listing note: ${ev.order.listing_note}`)}</div></div>` : ""}
+</section>`
+    : ""
+}
+<section class="exhibit" aria-labelledby="ex-d">
+  <header><span class="ex-tag">D</span><h2 id="ex-d">${txn?.access_logs ? "Access logs" : "Shipment"}</h2></header>
   ${
     txn?.access_logs
-      ? h`<table class="breakdown">${txn.access_logs.map((l) => h`<tr><td>${l.event.replace(/_/g, " ")}</td><td class="pts mono">${dateFmt(l.at)}</td></tr>`)}</table>`
+      ? h`<ol class="logs">${txn.access_logs.map((l) => h`<li>${hl(facts.has("access"), l.event.replace(/_/g, " "))}<span class="mono">${dateFmt(l.at)}</span></li>`)}</ol>`
       : tracking
         ? h`<dl class="kv">
     <dt>Carrier</dt><dd>${tracking.carrier} · <span class="mono">${tracking.tracking_number}</span></dd>
-    <dt>Status</dt><dd>${tracking.status === "DELIVERED" ? h`<span class="ok-mark">Delivered</span>` : tracking.status === "LOST" ? h`<span class="bad-mark">Lost</span>` : tracking.status.replace("_", " ")}</dd>
+    <dt>Status</dt><dd>${tracking.status === "DELIVERED" ? hl(facts.has("delivery"), h`<span class="ok-mark">${icon.check}Delivered</span>`) : tracking.status === "LOST" ? hl(facts.has("delivery"), h`<span class="bad-mark">${icon.x}Lost</span>`) : hl(facts.has("delivery"), tracking.status.replace("_", " "))}</dd>
     <dt>Shipped</dt><dd>${dateFmt(tracking.shipped_at)}</dd>
-    <dt>Delivered</dt><dd>${dateFmt(tracking.delivered_at)}${tracking.signed_by ? ` · signed by ${tracking.signed_by}` : ""}</dd>
+    <dt>Delivered</dt><dd>${dateFmt(tracking.delivered_at)}${tracking.signed_by ? h` · ${hl(facts.has("signature"), `signed by ${tracking.signed_by}`)}` : ""}</dd>
     <dt>Delivered to</dt><dd>${addressLine(tracking.delivery_address)}</dd>
-    <dt>Address check</dt><dd>${match === null ? "Not available" : match ? h`<span class="ok-mark">Matches the transaction address</span>` : h`<span class="bad-mark">Differs from the transaction address</span>`}</dd>
+    <dt>Address check</dt><dd>${match === null ? "Not available" : match ? hl(facts.has("address"), h`<span class="ok-mark">${icon.check}Matches the transaction address</span>`) : hl(facts.has("address"), h`<span class="bad-mark">${icon.x}Differs from the transaction address</span>`)}</dd>
   </dl>`
-        : h`<div class="callout warn">No tracking on file for this transaction.${hasError(ev.tracking) ? ` (${ev.tracking.error})` : ""}</div>`
+        : h`<div class="callout warn">${icon.alert}<div>No tracking on file for this transaction.${hasError(ev.tracking) ? ` (${ev.tracking.error})` : ""}</div></div>`
   }
 </section>`;
 }
@@ -227,7 +354,7 @@ function evidencePanel(ev: EvidenceView, now: Date): Safe {
 function traceView(trace: ToolRun[]): Safe {
   return h`${trace.map(
     (t) =>
-      h`<details class="trace"><summary><span class="mono">${t.name}</span>${t.ref ? h`<span class="ref">${t.ref}</span>` : ""}${t.is_error ? h`<span class="chip red plain">error</span>` : ""}</summary><pre>${JSON.stringify(t.output, null, 2)}</pre></details>`,
+      h`<details class="trace"><summary><span class="mono">${t.name}</span>${t.ref ? h`<span class="ref">${t.ref}</span>` : ""}${t.is_error ? h`<span class="chip red">error</span>` : ""}</summary><pre>${JSON.stringify(t.output, null, 2)}</pre></details>`,
   )}`;
 }
 
@@ -244,135 +371,192 @@ export interface Decision {
   } | null;
 }
 
+const modeName = (mode: "mock" | "sandbox") =>
+  mode === "mock" ? "PayPal simulator" : "PayPal sandbox";
+
+function auditMini(rows: AuditRow[], disputeId: string): Safe {
+  return h`<div class="receipt-audit"><h3>Audit entry</h3>
+  <ol class="mini-timeline">${rows.map((r) => h`<li><span class="mono when">${dateTimeFmt(r.ts)}</span><span>${r.actor} · ${r.event.replace(/_/g, " ")}</span><span class="hash mono" title="${r.hash}">#${r.id} ${r.hash.slice(0, 10)}</span></li>`)}</ol>
+  <a class="btn small ghost" href="/audit?dispute=${disputeId}">${icon.link}View audit trail for ${disputeId}</a></div>`;
+}
+
 export function decisionPanel(
   draft: StoredDraft,
   decision: Decision,
   mode: "mock" | "sandbox",
   errorText?: string,
+  audit: AuditRow[] = [],
 ): Safe {
   const rejected = decision.decision === "reject";
   const a = decision.action;
-  return h`<div id="draft-panel" class="card">
-  <div class="block">
-    <h3>Decision</h3>
-    ${
-      rejected
-        ? h`<div class="callout info"><strong>Rejected.</strong> Nothing was sent to PayPal. Decided by ${decision.decidedBy} on ${dateTimeFmt(decision.decidedAt)}.</div>`
-        : a?.status === "ok"
-          ? h`<div class="callout ok"><strong>Submitted to PayPal${mode === "mock" ? " (mock)" : " sandbox"}.</strong> ${decision.decision === "edit" ? "Sent with your edits. " : ""}Dispute is now ${statusChip(String((a.response as { status?: string } | null)?.status ?? "OTHER"))}</div>
-             <dl class="kv"><dt>Action</dt><dd class="mono">${a.kind}</dd><dt>PayPal-Request-Id</dt><dd class="mono">${a.request_id}</dd><dt>Attempts</dt><dd>${a.attempts}</dd></dl>
-             <h3 style="margin-top:14px">PayPal response</h3><pre class="payload">${JSON.stringify(a.response, null, 2)}</pre>`
-          : a?.status === "in_flight"
-            ? h`<div class="callout info"><strong>Submission in progress.</strong> The request is with PayPal. Reload in a moment; it will not be sent twice.</div>`
-            : h`<div class="callout error"><strong>PayPal did not accept the submission.</strong> ${errorText ?? ""} The draft is saved. Retrying reuses the same PayPal-Request-Id, so it cannot be applied twice.</div>
-             <form style="margin-top:12px" hx-post="/drafts/${draft.id}/approve" hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="find button">
+  const sent = !rejected && a?.status === "ok";
+  const auditBlock = auditMini(audit, draft.dispute_id);
+  return h`<div id="draft-panel" class="panel decision reveal">
+  ${
+    rejected
+      ? h`<div class="stamp rejected" role="img" aria-label="Rejected"><span>Rejected</span></div>
+      <h2 class="decision-title">Rejected</h2>
+      <p class="lede">Nothing was sent to PayPal. Decided by ${decision.decidedBy} on ${dateTimeFmt(decision.decidedAt)}.</p>`
+      : sent
+        ? h`<div class="stamp" role="img" aria-label="Sent"><span>Sent</span><small>${modeName(mode)}</small></div>
+      <h2 class="decision-title">Sent to PayPal${decision.decision === "edit" ? " with your edits" : ""}</h2>
+      <p class="lede">${mode === "mock" ? "Delivered to the built-in simulator. " : ""}Dispute is now ${statusChip(String((a?.response as { status?: string } | null)?.status ?? "OTHER"))}</p>
+      <dl class="kv receipt"><dt>Action</dt><dd class="mono">${a?.kind}</dd><dt>PayPal-Request-Id</dt><dd class="mono">${a?.request_id}</dd><dt>Attempts</dt><dd>${a?.attempts}</dd><dt>Approved by</dt><dd>${decision.decidedBy} · ${dateTimeFmt(decision.decidedAt)}</dd></dl>
+      <details class="trace"><summary><span class="mono">PayPal response</span></summary><pre>${JSON.stringify(a?.response, null, 2)}</pre></details>`
+        : a?.status === "in_flight"
+          ? h`<div class="callout info">${icon.info}<div><strong>Submission in progress.</strong> The request is with PayPal. Reload in a moment; it will not be sent twice.</div></div>`
+          : h`<div class="callout error">${icon.alert}<div><strong>PayPal did not accept the submission.</strong> ${errorText ?? ""} The draft is saved. Retrying reuses the same PayPal-Request-Id, so it cannot be applied twice.</div></div>
+             <form class="retry" hx-post="/drafts/${draft.id}/approve" hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="find button">
                <input type="hidden" name="idempotency_key" value="${a?.request_id ?? ""}">
                <input type="hidden" name="draft_id" value="${draft.id}">
                <input type="hidden" name="draft_version" value="${draft.version}">
                <button class="btn primary" type="submit">Retry submission</button></form>`
-    }
-    <p class="hint" style="margin-top:12px"><a href="/audit?dispute=${draft.dispute_id}">View audit trail for ${draft.dispute_id}</a></p>
-  </div></div>`;
+  }
+  ${auditBlock}
+</div>`;
 }
+
+const SOURCE_NOTE =
+  "Pre-written draft from fixtures/llm-cache. This is not real Claude output. Set ANTHROPIC_API_KEY for a live model draft.";
 
 export function draftPanel(
   draft: StoredDraft,
-  ctx: { mode: "mock" | "sandbox"; idempotencyKey: string },
+  ctx: {
+    mode: "mock" | "sandbox";
+    idempotencyKey: string;
+    amount: { currency_code: string; value: string };
+  },
 ): Safe {
   const d = draft.draft;
   const s = draft.scoreResult;
-  const recClass = d.recommendation.toLowerCase();
+  const contest = d.recommendation === "CONTEST";
+  const chance = winChance({ recommendation: d.recommendation, score: draft.score });
+  const amount = Number(ctx.amount.value);
+  const recover =
+    chance !== null
+      ? amount * chance
+      : d.recommendation === "OFFER_PARTIAL" && d.offer
+        ? Math.max(0, amount - Number(d.offer.amount))
+        : 0;
+  const ledger = checklistFor(draft);
+  const count = (state: string) => ledger.filter((i) => i.state === state).length;
   const sourceChip =
     draft.source === "replayed"
-      ? h`<span class="chip violet plain" title="A pre-scripted draft from fixtures/llm-cache. This is not real Claude output. Set ANTHROPIC_API_KEY to get a live model draft.">Scripted demo fixture</span>`
-      : h`<span class="chip blue plain">Live ${draft.model}</span>`;
-  return h`<div id="draft-panel" class="card">
+      ? h`<span class="chip fixture" title="${SOURCE_NOTE}">${icon.file}Scripted demo fixture</span>`
+      : h`<span class="chip live">${icon.shield}Live · ${draft.model}</span>`;
+  return h`<div id="draft-panel" class="panel draft reveal">
 <form id="draft-form" hx-post="/drafts/${draft.id}/preview" hx-target="#modal-slot" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">
-  <div class="rec">
-    ${scoreRing(draft.score, "lg")}
-    <div>
-      <div class="rec-label">Agent recommends</div>
-      <div class="rec-value ${recClass}">${d.recommendation.replace("_", " ")}</div>
-      <div class="sub">Confidence ${Math.round(d.confidence * 100)}% · draft v${draft.version}</div>
+  <div class="draft-top"><span class="eyebrow">Agent draft · v${draft.version}</span>${sourceChip}</div>
+  ${draft.source === "replayed" ? h`<p class="fixture-note">${SOURCE_NOTE}</p>` : ""}
+  <div class="verdict">
+    ${gauge(draft.score, contest)}
+    <div class="verdict-text">
+      <span class="eyebrow">Agent recommends</span>
+      <div class="rec-value ${d.recommendation.toLowerCase()}">${d.recommendation.replace("_", " ")}</div>
+      <p class="sub">Confidence ${Math.round(d.confidence * 100)}%${chance !== null ? " · win chance is the evidence score, not a PayPal prediction" : ""}</p>
+      <p class="ev-line">Expected recovery <b class="tnum">${money({ currency_code: ctx.amount.currency_code, value: recover.toFixed(2) })}</b> <span class="sub">of ${money(ctx.amount)}</span></p>
     </div>
-    <div class="rec-meta">${sourceChip}<span class="sub">Evidence quality score</span></div>
   </div>
-  <div class="block"><h3>Reasoning</h3><p class="reasoning">${d.reasoning}</p>
-    ${d.dispute_reason_understood ? h`<p class="sub" style="margin-top:6px">Understood as: ${d.dispute_reason_understood}</p>` : ""}
-    ${(d.flags ?? []).map((f) => h`<div class="callout warn"><strong>Flagged:</strong> ${f}</div>`)}
-    ${d.deadline_note ? h`<div class="callout info">${d.deadline_note}</div>` : ""}
+  <div class="actions">
+    <button class="btn primary big" type="submit">Review &amp; approve${icon.arrow}<span class="spinner htmx-indicator" aria-hidden="true"></span></button>
+    <button class="btn danger" type="button" hx-post="/drafts/${draft.id}/reject" hx-vals='${JSON.stringify({ idempotency_key: `${ctx.idempotencyKey}-reject` })}' hx-target="#draft-panel" hx-swap="outerHTML" hx-confirm="Reject this draft? Nothing will be sent to PayPal.">Reject</button>
+    <p class="hint">You see the exact ${ctx.mode === "mock" ? "(simulated) " : ""}PayPal request before anything is sent.</p>
   </div>
+  <section class="block" aria-labelledby="led-h">
+    <div class="block-head"><h3 id="led-h">Evidence ledger</h3><span class="tally"><b class="have">${count("have")}</b> have <b class="weak">${count("weak")}</b> weak <b class="missing">${count("missing")}</b> missing</span></div>
+    <ul class="ledger">${ledger.map(
+      (i) => h`<li class="led ${i.state}" data-state="${i.state}">
+      <span class="led-ic">${i.state === "have" ? icon.checkCircle : i.state === "weak" ? icon.halfCircle : icon.flag}</span>
+      <div><b>${i.label}</b><span class="led-detail">${i.detail}</span>${i.collect ? h`<p class="collect"><em>Collect</em>${i.collect}</p>` : ""}</div>
+      <span class="led-tag">${i.state === "have" ? "Have" : i.state === "weak" ? "Weak" : "Missing"}</span></li>`,
+    )}</ul>
+  </section>
   ${
     s.warnings.length > 0
-      ? h`<div class="block"><div class="callout error"><strong>Grounding warnings</strong><ul>${s.warnings.map((w) => h`<li>${w}</li>`)}</ul></div></div>`
+      ? h`<div class="callout error">${icon.alert}<div><strong>Grounding warnings</strong><ul>${s.warnings.map((w) => h`<li>${w}</li>`)}</ul></div></div>`
       : ""
   }
-  <div class="block"><h3>Score breakdown</h3>
-    <table class="breakdown">
-    ${s.breakdown.map((p) => h`<tr class="${p.applicable ? "" : "na"}"><td>${p.label}<span class="why">${p.reason}</span></td><td class="pts">${p.applicable ? `${p.points} / ${p.max}` : "n/a"}</td></tr>`)}
-    ${s.penalties.map((p) => h`<tr class="pen"><td>Penalty: ${p.key.replace(/_/g, " ")}<span class="why">${p.reason}</span></td><td class="pts">${p.points}</td></tr>`)}
-    </table>
-  </div>
+  <section class="block" aria-labelledby="bd-h">
+    <div class="block-head"><h3 id="bd-h">How the score is built</h3><span class="tally"><b class="tnum">${draft.score}</b> / 100</span></div>
+    <ul class="parts">
+    ${s.breakdown.map((p) => h`<li class="part ${p.applicable ? "" : "na"}" data-part="${p.key}"><div class="part-head"><span>${p.label}</span><span class="pts tnum">${p.applicable ? h`${p.points}<i>/${p.max}</i>` : "n/a"}</span></div><span class="bar" role="img" aria-label="${p.applicable ? `${p.points} of ${p.max} points` : "Not applicable"}"><i style="--w:${p.applicable ? Math.round((p.points / p.max) * 100) : 0}%"></i></span><span class="why">${p.reason}</span></li>`)}
+    ${s.penalties.map((p) => h`<li class="part pen" data-part="${p.key}"><div class="part-head"><span>Penalty: ${p.key.replace(/_/g, " ")}</span><span class="pts tnum">${p.points}</span></div><span class="why">${p.reason}</span></li>`)}
+    </ul>
+  </section>
+  <section class="block" aria-labelledby="rs-h"><h3 id="rs-h">Reasoning</h3><p class="reasoning">${d.reasoning}</p>
+    ${d.dispute_reason_understood ? h`<p class="sub understood">Understood as: ${d.dispute_reason_understood}</p>` : ""}
+    ${(d.flags ?? []).map((f) => h`<div class="callout warn">${icon.flag}<div><strong>Flagged:</strong> ${f}</div></div>`)}
+    ${d.deadline_note ? h`<div class="callout info">${icon.info}<div>${d.deadline_note}</div></div>` : ""}
+  </section>
   ${
     d.recommendation === "OFFER_PARTIAL" && d.offer
-      ? h`<div class="block"><h3>Offer</h3><p>${d.offer.offer_type.replace(/_/g, " ").toLowerCase()} of <strong>${d.offer.amount}</strong></p></div>`
+      ? h`<section class="block"><h3>Offer</h3><p>${d.offer.offer_type.replace(/_/g, " ").toLowerCase()} of <strong class="tnum">${d.offer.amount}</strong></p></section>`
       : ""
   }
   ${
     d.evidences.length > 0
-      ? h`<div class="block"><h3>Drafted evidence</h3>
+      ? h`<section class="block" aria-labelledby="ev-h"><div class="block-head"><h3 id="ev-h">Drafted evidence</h3><span class="sub">Click a note to edit it</span></div>
     ${d.evidences.map(
-      (e, i) => h`<div class="evidence">
-      <div class="evidence-head"><span class="chip gray plain">${e.evidence_type.replace(/_/g, " ").toLowerCase()}</span>${e.tracking ? h`<span class="ref">${e.tracking.carrier} ${e.tracking.number}</span>` : ""}${(e.refund_ids ?? []).map((r) => h`<span class="ref">${r}</span>`)}</div>
-      <textarea name="note_${i}" readonly maxlength="2000" aria-label="Evidence note ${i + 1}">${e.notes}</textarea>
+      (e, i) => h`<div class="note">
+      <div class="note-head"><span class="chip gray">${e.evidence_type.replace(/_/g, " ").toLowerCase()}</span>${e.tracking ? h`<span class="ref">${e.tracking.carrier} ${e.tracking.number}</span>` : ""}${(e.refund_ids ?? []).map((r) => h`<span class="ref">${r}</span>`)}<span class="edited" hidden>Edited</span></div>
+      <textarea name="note_${i}" maxlength="2000" rows="4" data-autogrow aria-label="Evidence note ${i + 1}">${e.notes}</textarea>
       <div class="refs">${e.source_refs.map((r) => h`<span class="ref">${r}</span>`)}</div>
     </div>`,
-    )}</div>`
+    )}</section>`
       : ""
   }
   ${
     d.recommendation !== "CONTEST"
-      ? h`<div class="block field"><h3>Message to PayPal</h3><textarea name="merchant_message" readonly maxlength="2000" aria-label="Message to PayPal">${d.merchant_message ?? ""}</textarea></div>`
+      ? h`<section class="block note"><div class="block-head"><h3>Message to PayPal</h3><span class="edited" hidden>Edited</span></div><textarea name="merchant_message" maxlength="2000" rows="4" data-autogrow aria-label="Message to PayPal">${d.merchant_message ?? ""}</textarea></section>`
       : ""
   }
-  ${
-    d.missing_evidence.length > 0
-      ? h`<div class="block"><div class="callout warn"><strong>Missing evidence, merchant input needed</strong><ul>${d.missing_evidence.map((m) => h`<li>${m}</li>`)}</ul></div></div>`
-      : ""
-  }
-  <div class="block"><h3>Agent tool calls (${draft.trace.length})</h3>${traceView(draft.trace)}</div>
-  <div class="actions">
-    <button class="btn primary" type="submit">Approve</button>
-    <button class="btn" type="button" id="edit-btn" onclick="document.querySelectorAll('#draft-form textarea').forEach(function(t){t.removeAttribute('readonly')});var f=document.querySelector('#draft-form textarea');if(f)f.focus();this.disabled=true;">Edit</button>
-    <span class="spinner htmx-indicator" aria-hidden="true"></span>
-    <span class="spacer"></span>
-    <button class="btn danger" type="button" hx-post="/drafts/${draft.id}/reject" hx-vals='${JSON.stringify({ idempotency_key: `${ctx.idempotencyKey}-reject` })}' hx-target="#draft-panel" hx-swap="outerHTML" hx-confirm="Reject this draft? Nothing will be sent to PayPal.">Reject</button>
-  </div>
-  <p class="hint" style="padding:0 20px 16px">Approve shows the exact request before anything is sent to PayPal${ctx.mode === "mock" ? " (mock)" : " sandbox"}.</p>
+  <details class="trace-all"><summary>Reasoning trace <span class="count">${draft.trace.length} tool calls</span></summary><div>${traceView(draft.trace)}</div></details>
 </form></div>`;
 }
 
+const DRAFT_STEPS = [
+  "Reading the dispute and buyer messages",
+  "Fetching transaction, order and tracking",
+  "Checking merchant policy and buyer history",
+  "Drafting evidence and scoring it",
+];
+
 export function noDraftPanel(disputeId: string, error?: string): Safe {
-  return h`<div id="draft-panel" class="card">
-  <div class="empty">
+  return h`<div id="draft-panel" class="panel empty draft-empty reveal">
+  <div class="idle">
+    <svg class="empty-art" viewBox="0 0 120 96" aria-hidden="true"><rect x="22" y="10" width="76" height="76" rx="8" class="ea-sheet"/><path d="M36 30h48M36 42h48M36 54h30" class="ea-line"/><circle cx="86" cy="70" r="14" class="ea-ring ${error ? "warn" : ""}"/>${error ? raw('<path d="M86 63v8M86 76v.5" class="ea-check warn"/>') : raw('<path d="M80 70l4 4 8-9" class="ea-check"/>')}</svg>
     <h2>${error ? "The agent could not draft a response" : "No draft yet"}</h2>
     ${
       error
-        ? h`<div class="callout error" style="text-align:left">${error}</div><p class="hint" style="margin-top:8px">Nothing was sent to PayPal.</p>`
+        ? h`<div class="callout error" role="alert">${icon.alert}<div>${error}</div></div><p class="hint">Nothing was sent to PayPal.</p>`
         : h`<p>The agent reads the dispute, transaction, order and tracking, then drafts evidence you can edit and approve.</p>`
     }
-    <button class="btn primary" hx-post="/disputes/${disputeId}/draft" hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="this">
-      ${error ? "Retry" : "Draft with agent"} <span class="spinner htmx-indicator" aria-hidden="true"></span>
+    <button class="btn primary big" hx-post="/disputes/${disputeId}/draft" hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator="#draft-panel">
+      ${error ? "Retry" : "Draft with agent"}${icon.arrow}
     </button>
-  </div></div>`;
+  </div>
+  <div class="drafting" role="status" aria-live="polite">
+    <span class="eyebrow">Agent is working</span>
+    <ol class="steps">${DRAFT_STEPS.map((s, i) => h`<li style="--i:${i}">${s}</li>`)}</ol>
+    <div class="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
+  </div>
+</div>`;
 }
 
 export function detailPage(ev: EvidenceView, panel: Safe, now: Date): Safe {
-  return h`<a class="crumb" href="/">← All disputes</a>
-<div class="page-head"><div><h1>${ev.dispute.dispute_id}</h1><p>${REASON_LABEL[ev.dispute.reason]} · ${money(ev.dispute.dispute_amount)}</p></div></div>
+  const d = ev.dispute;
+  const buyer = d.disputed_transactions[0]?.buyer.name;
+  return h`<a class="crumb" href="/">${icon.back}All disputes</a>
+<div class="page-head dispute-head">
+  <div><span class="eyebrow mono">${d.dispute_id}${buyer ? ` · ${buyer}` : ""}</span><h1>${REASON_LABEL[d.reason]}</h1></div>
+  <div class="head-meta">
+    <div class="head-amount"><span class="stat-label">Disputed</span><span class="stat-fig tnum">${money(d.dispute_amount)}</span></div>
+    <div class="head-due">${deadlineRingView(deadlineRing(d.seller_response_due_date, now), "lg")}<span class="stat-label">Respond by<br><b>${dateFmt(d.seller_response_due_date)}</b></span></div>
+  </div>
+</div>
 <div class="layout">
-  <div>${evidencePanel(ev, now)}</div>
-  <div>${panel}</div>
+  <div class="case-col">${caseFile(ev, now)}</div>
+  <div class="draft-col">${panel}</div>
 </div>
 <div id="modal-slot"></div>`;
 }
@@ -387,35 +571,39 @@ export function previewDialog(
     fields: Record<string, string>;
   },
 ): Safe {
-  const endpoint = `POST /v1/customer/disputes/${draft.dispute_id}/${payload.kind}`;
-  return h`<dialog id="approval-dialog" aria-labelledby="dlg-title">
+  const req = outboundRequest(payload, draft.dispute_id, opts.idempotencyKey, opts.mode);
+  return h`<dialog id="approval-dialog" class="sheet" aria-labelledby="dlg-title">
 <form hx-post="/drafts/${draft.id}/approve" hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
-  <div class="dlg-head">
-    <span class="mode ${opts.mode}">${opts.mode.toUpperCase()}</span>
-    <h2 id="dlg-title" style="font-size:1.25rem;margin-top:10px">Approve and send to PayPal</h2>
-    <p class="sub" style="margin-top:4px">This is the exact request that will be sent. Nothing leaves this app until you confirm.</p>
-  </div>
-  <div class="dlg-body">
-    <div id="approval-error"></div>
-    <div class="endpoint">${endpoint}</div>
-    <div class="endpoint" style="margin-top:6px">PayPal-Request-Id: ${opts.idempotencyKey}</div>
-    ${opts.edits.length > 0 ? h`<div class="callout info">You edited: ${opts.edits.join(", ")}. The recorded decision will be "edit" and both versions are kept.</div>` : h`<div class="callout ok">Unedited agent draft.</div>`}
-    <pre class="payload">${JSON.stringify(payload.request, null, 2)}</pre>
+  <header class="sheet-head">
+    <div class="sheet-kicker"><span class="eyebrow">Final check</span><span class="mode ${opts.mode}">${opts.mode.toUpperCase()}</span></div>
+    <h2 id="dlg-title">Send this to PayPal?</h2>
+    <p>This is the exact request that will be sent. Nothing leaves this app until you approve it.</p>
+  </header>
+  <div class="sheet-body">
+    <div id="approval-error" role="alert"></div>
+    ${req.notSent ? h`<div class="callout info">${icon.info}<div>${req.notSent}</div></div>` : ""}
+    ${opts.edits.length > 0 ? h`<div class="callout info">${icon.info}<div>You edited: ${opts.edits.join(", ")}. The recorded decision will be "edit" and both versions are kept.</div></div>` : h`<div class="callout ok">${icon.check}<div>Unedited agent draft.</div></div>`}
+    <div class="req">
+      <div class="req-line"><span class="verb">${req.method}</span><code class="req-url">${req.url}</code></div>
+      <dl class="req-headers">${req.headers.map(([k, v]) => h`<dt>${k}</dt><dd>${v}</dd>`)}</dl>
+      <div class="req-label">${req.bodyLabel}</div>
+      <pre class="payload">${req.body}</pre>
+    </div>
     <input type="hidden" name="idempotency_key" value="${opts.idempotencyKey}">
     <input type="hidden" name="draft_id" value="${draft.id}">
     <input type="hidden" name="draft_version" value="${draft.version}">
     ${Object.entries(opts.fields).map(([k, v]) => h`<input type="hidden" name="${k}" value="${v}">`)}
   </div>
-  <div class="dlg-foot">
-    <button class="btn" type="button" onclick="this.closest('dialog').close()">Cancel</button>
-    <button class="btn primary" type="submit">Approve &amp; submit <span class="spinner htmx-indicator" aria-hidden="true"></span></button>
-  </div>
+  <footer class="sheet-foot">
+    <button class="btn" type="button" autofocus onclick="this.closest('dialog').close()">Cancel</button>
+    <button class="btn primary big stamp-btn" type="submit">Approve &amp; send ${icon.send}<span class="spinner htmx-indicator" aria-hidden="true"></span></button>
+  </footer>
 </form></dialog>
-<script>(function(){var d=document.getElementById("approval-dialog");if(d&&!d.open)d.showModal();})();</script>`;
+<script>(function(){var d=document.getElementById("approval-dialog");if(!d)return;d.addEventListener("click",function(e){if(e.target===d)d.close()});if(!d.open)d.showModal();})();</script>`;
 }
 
 export function errorFragment(message: string): Safe {
-  return h`<div class="callout error" role="alert">${message}</div>`;
+  return h`<div class="callout error" role="alert">${icon.alert}<div>${message}</div></div>`;
 }
 
 export function auditPage(
@@ -424,30 +612,28 @@ export function auditPage(
   disputeId: string | undefined,
 ): Safe {
   const actorTone: Record<string, string> = {
-    agent: "violet",
-    human: "green",
-    system: "gray",
-    paypal: "blue",
+    agent: "agent",
+    human: "human",
+    system: "system",
+    paypal: "paypal",
   };
-  return h`<div class="page-head"><div><h1>Audit trail</h1><p>${disputeId ? `Events for ${disputeId}.` : "Every agent step, human decision and PayPal exchange."} Each entry hashes the one before it.</p></div>
-  <div style="display:flex;gap:8px">${disputeId ? h`<a class="btn small" href="/audit">All events</a>` : ""}<a class="btn small" href="/audit/export.json" download="audit.json">Export JSON</a></div></div>
-<div class="card">
-  <div class="verify ${chain.ok ? "ok" : "bad"}" role="status">
-    <strong>${chain.ok ? "Hash chain verified" : `Chain broken at entry #${chain.brokenAt}`}</strong>
-    <span>${chain.length} entries across all disputes · <a href="/audit/verify">verify JSON</a></span>
-  </div>
-  ${
-    rows.length === 0
-      ? h`<div class="empty"><h2>No events yet</h2><p>Syncing, drafting and approvals will appear here.</p></div>`
-      : h`<ol class="timeline">${rows.map(
-          (r) => h`<li data-event="${r.event}">
-    <span class="when">${dateTimeFmt(r.ts)}</span>
-    <span><span class="chip plain ${actorTone[r.actor] ?? "gray"}">${r.actor}</span></span>
-    <div><span class="ev">${r.event.replace(/_/g, " ")}</span>${r.dispute_id ? h` <a class="sub" href="/audit?dispute=${r.dispute_id}">${r.dispute_id}</a>` : ""}
+  return h`<div class="page-head"><div><span class="eyebrow">${disputeId ? disputeId : "All disputes"}</span><h1>Audit trail</h1><p class="lede">${disputeId ? `Events for ${disputeId}.` : "Every agent step, human decision and PayPal exchange."} Each entry hashes the one before it.</p></div>
+  <div class="head-actions">${disputeId ? h`<a class="btn small ghost" href="/audit">All events</a>` : ""}<a class="btn small" href="/audit/export.json" download="audit.json">${icon.download}Export JSON</a></div></div>
+<div class="verify ${chain.ok ? "ok" : "bad"}" role="status">
+  <span class="verify-ic">${chain.ok ? icon.shield : icon.alert}</span>
+  <div><strong>${chain.ok ? "Hash chain verified" : `Chain broken at entry #${chain.brokenAt}`}</strong>
+  <span>${chain.length} entries across all disputes · <a href="/audit/verify">verify JSON</a></span></div>
+</div>
+${
+  rows.length === 0
+    ? h`<div class="panel empty"><h2>No events yet</h2><p>Syncing, drafting and approvals will appear here.</p></div>`
+    : h`<ol class="timeline">${rows.map(
+        (r) => h`<li data-event="${r.event}" class="ev-${actorTone[r.actor] ?? "system"}">
+    <span class="when mono">${dateTimeFmt(r.ts)}</span>
+    <span class="node" aria-hidden="true"></span>
+    <div class="ev-body"><div class="ev-line"><span class="actor">${r.actor}</span><span class="ev">${r.event.replace(/_/g, " ")}</span>${r.dispute_id ? h`<a class="ev-link mono" href="/audit?dispute=${r.dispute_id}">${r.dispute_id}</a>` : ""}<span class="hash mono" title="${r.hash}">#${r.id} ${r.hash.slice(0, 10)}</span></div>
       <details><summary>Payload</summary><pre>${JSON.stringify(JSON.parse(r.payload_json), null, 2)}</pre></details></div>
-    <span class="hash mono" title="${r.hash}">#${r.id} ${r.hash.slice(0, 10)}</span>
   </li>`,
-        )}</ol>`
-  }
-</div>`;
+      )}</ol>`
+}`;
 }

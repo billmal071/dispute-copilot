@@ -1,7 +1,7 @@
 import { createDraft, latestDraft } from "../agent/draft.js";
 import type { AppContext } from "../app.js";
 
-export const DEMO_UNDRAFTED = ["PP-D-1012", "PP-D-1013"];
+export const DEMO_UNDRAFTED = ["PP-D-1005", "PP-D-1012"];
 
 type PrefillContext = Pick<AppContext, "mode" | "db" | "reader" | "merchant" | "llm" | "clock">;
 

@@ -39,12 +39,12 @@ export function winChance(draft: { recommendation: string; score: number }): num
 }
 
 const urgencyFactor = (hours: number | null): number =>
-  hours === null ? 1 : hours <= 0 ? 4 : 1 + 3 * Math.exp(-hours / 48);
+  hours === null ? 1 : hours <= 0 ? 6 : 1 + 5 * Math.exp(-hours / 36);
 
 const hoursLeft = (due: string | null, now: Date): number | null =>
   due ? (new Date(due).getTime() - now.getTime()) / HOUR : null;
 
-function valueOf(row: InboxRow): Pick<RankedRow, "winChance" | "scored" | "expectedValue"> {
+function estimate(row: InboxRow): Pick<RankedRow, "winChance" | "scored" | "expectedValue"> {
   const amount = Number(row.dispute.dispute_amount.value);
   const { draft } = row;
   if (!draft) return { winChance: null, scored: false, expectedValue: amount * UNSCORED_PRIOR };
@@ -54,13 +54,10 @@ function valueOf(row: InboxRow): Pick<RankedRow, "winChance" | "scored" | "expec
   return { winChance: null, scored: true, expectedValue: Math.max(0, kept) };
 }
 
-export function rankRows(
-  rows: InboxRow[],
-  now: Date,
-): { ranked: RankedRow[]; totals: Totals } {
+export function rankRows(rows: InboxRow[], now: Date): { ranked: RankedRow[]; totals: Totals } {
   const scoredRows = rows.map((row) => {
     const actionable = row.dispute.status === "WAITING_FOR_SELLER_RESPONSE" && !row.decision;
-    const value = valueOf(row);
+    const value = estimate(row);
     const hours = hoursLeft(row.dispute.seller_response_due_date, now);
     return {
       row,
@@ -74,7 +71,8 @@ export function rankRows(
     if (a.actionable && b.priority !== a.priority) return b.priority - a.priority;
     const due = (r: typeof a) => r.row.dispute.seller_response_due_date ?? "9";
     return (
-      due(a).localeCompare(due(b)) || a.row.dispute.dispute_id.localeCompare(b.row.dispute.dispute_id)
+      due(a).localeCompare(due(b)) ||
+      a.row.dispute.dispute_id.localeCompare(b.row.dispute.dispute_id)
     );
   });
   const ranked = scoredRows.map((r, i) => ({ ...r, rank: i + 1 }));
@@ -200,9 +198,7 @@ export function outboundRequest(
       ["PayPal-Request-Id", requestId],
       ["Content-Type", multipart ? "multipart/form-data" : "application/json"],
     ],
-    bodyLabel: multipart
-      ? 'multipart part "input" (application/json, input.json)'
-      : "JSON body",
+    bodyLabel: multipart ? 'multipart part "input" (application/json, input.json)' : "JSON body",
     body: JSON.stringify(body, null, 2),
     notSent:
       mode === "mock"
@@ -250,5 +246,24 @@ export function pageMeta(key: RouteKey, ctx: { id?: string } = {}): PageMeta {
         description:
           "Dispute Copilot hit an unexpected error. It was logged, and your drafts, decisions and audit trail are unaffected.",
       };
+  }
+}
+
+export type Fact = "delivery" | "address" | "signature" | "refunds" | "listing" | "access";
+
+export function relevantFacts(reason: Dispute["reason"]): Set<Fact> {
+  switch (reason) {
+    case "MERCHANDISE_OR_SERVICE_NOT_RECEIVED":
+    case "UNAUTHORISED":
+      return new Set<Fact>(["delivery", "address", "signature"]);
+    case "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED":
+      return new Set<Fact>(["listing", "refunds"]);
+    case "DUPLICATE_TRANSACTION":
+    case "CREDIT_NOT_PROCESSED":
+      return new Set<Fact>(["refunds"]);
+    case "CANCELED_RECURRING_BILLING":
+      return new Set<Fact>(["access"]);
+    case "OTHER":
+      return new Set<Fact>();
   }
 }

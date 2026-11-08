@@ -1,17 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { buildPayload } from "../src/actions/approve.js";
+import { createDraft, latestDraft } from "../src/agent/draft.js";
+import type { Dispute } from "../src/types.js";
 import {
   checklistFor,
   deadlineRing,
   outboundRequest,
   pageMeta,
   rankRows,
+  relevantFacts,
   winChance,
 } from "../src/web/insight.js";
 import type { InboxRow } from "../src/web/views.js";
-import type { Dispute } from "../src/types.js";
-import { buildPayload } from "../src/actions/approve.js";
 import { makeApp } from "./app-helpers.js";
-import { latestDraft, createDraft } from "../src/agent/draft.js";
 
 const NOW = new Date("2026-11-10T12:00:00Z");
 const inHours = (h: number) => new Date(NOW.getTime() + h * 3600000).toISOString();
@@ -64,10 +65,10 @@ describe("rankRows", () => {
       row("BIG-LATE", "900.00", 160, contest(60)),
       row("SMALL-SOON", "40.00", 6, contest(95)),
       row("MID-SOON", "300.00", 20, contest(90)),
-      row("BIG-WEAK-SOON", "500.00", 20, contest(10)),
+      row("BIG-WEAK-SOON", "500.00", 20, contest(5)),
     ];
     const ids = rankRows(rows, NOW).ranked.map((r) => r.row.dispute.dispute_id);
-    expect(ids).toEqual(["MID-SOON", "BIG-LATE", "BIG-WEAK-SOON", "SMALL-SOON"]);
+    expect(ids).toEqual(["MID-SOON", "BIG-LATE", "SMALL-SOON", "BIG-WEAK-SOON"]);
   });
 
   it("puts decided and non-actionable disputes after actionable ones", () => {
@@ -110,10 +111,18 @@ describe("rankRows", () => {
 
 describe("deadlineRing", () => {
   it("fills the ring by the share of the 7 day window that is left and flags urgency", () => {
-    expect(deadlineRing(inHours(84), NOW)).toMatchObject({ fraction: 0.5, tone: "ok", label: "3d" });
+    expect(deadlineRing(inHours(84), NOW)).toMatchObject({
+      fraction: 0.5,
+      tone: "ok",
+      label: "3d",
+    });
     expect(deadlineRing(inHours(30), NOW)).toMatchObject({ tone: "warn", label: "1d" });
     expect(deadlineRing(inHours(5), NOW)).toMatchObject({ tone: "urgent", label: "5h" });
-    expect(deadlineRing(inHours(-1), NOW)).toMatchObject({ fraction: 0, tone: "urgent", label: "Late" });
+    expect(deadlineRing(inHours(-1), NOW)).toMatchObject({
+      fraction: 0,
+      tone: "urgent",
+      label: "Late",
+    });
     expect(deadlineRing(null, NOW)).toMatchObject({ label: "None" });
   });
 });
@@ -156,11 +165,14 @@ describe("checklist and outbound request on real fixture drafts", () => {
     const stored = latestDraft(app.db, "PP-D-1001");
     if (!stored) throw new Error("no draft");
     const dispute = JSON.parse(
-      (app.db.prepare("SELECT raw_json FROM disputes WHERE paypal_id = ?").get("PP-D-1001") as {
-        raw_json: string;
-      }).raw_json,
+      (
+        app.db.prepare("SELECT raw_json FROM disputes WHERE paypal_id = ?").get("PP-D-1001") as {
+          raw_json: string;
+        }
+      ).raw_json,
     ) as Dispute;
     const payload = buildPayload(dispute, stored.draft);
+    if (payload.kind !== "provide-evidence") throw new Error("expected a contest payload");
     const req = outboundRequest(payload, "PP-D-1001", "key-123", "sandbox");
     expect(req.method).toBe("POST");
     expect(req.url).toBe(
@@ -185,5 +197,19 @@ describe("checklist and outbound request on real fixture drafts", () => {
     );
     expect(accept.headers).toContainEqual(["Content-Type", "application/json"]);
     expect(JSON.parse(accept.body)).toEqual({ note: "n", accept_claim_reason: "REASON_NOT_SET" });
+  });
+});
+
+describe("relevantFacts", () => {
+  it("highlights delivery facts for non-receipt and refunds for duplicates", () => {
+    expect(relevantFacts("MERCHANDISE_OR_SERVICE_NOT_RECEIVED")).toEqual(
+      new Set(["delivery", "address", "signature"]),
+    );
+    expect(relevantFacts("UNAUTHORISED").has("delivery")).toBe(true);
+    expect(relevantFacts("DUPLICATE_TRANSACTION")).toEqual(new Set(["refunds"]));
+    expect(relevantFacts("MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED")).toEqual(
+      new Set(["listing", "refunds"]),
+    );
+    expect(relevantFacts("CANCELED_RECURRING_BILLING")).toEqual(new Set(["access"]));
   });
 });
