@@ -2,6 +2,7 @@ import { createContext, initialSync } from "./app.js";
 import { loadConfig } from "./config.js";
 import { loadDotenv } from "./env.js";
 import { listen } from "./listen.js";
+import { prefillDemoDrafts } from "./seed/prefill.js";
 import { createServer } from "./server.js";
 
 try {
@@ -13,6 +14,12 @@ try {
     await initialSync(ctx);
   } catch (err) {
     console.warn(`Initial sync failed, starting with local data only: ${String(err)}`);
+  }
+
+  try {
+    await prefillDemoDrafts(ctx);
+  } catch (err) {
+    console.warn(`Demo drafts were not prefilled: ${String(err)}`);
   }
 
   const info = await listen(createServer(ctx).fetch, config.port, config.host);
