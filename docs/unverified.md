@@ -12,3 +12,4 @@ All isolated in `src/paypal/real.ts` and `src/paypal/mappers.ts`. Confirm in the
 - require-evidence `{action: "SELLER_EVIDENCE"}` and adjudicate `{adjudication_outcome}` bodies.
 - Webhook verification via `POST /v1/notifications/verify-webhook-signature`.
 - Mock error codes (for example `DISPUTE_STATUS_NOT_VALID`) are plausible, not copied from PayPal.
+- `PayPal-Request-Id` honoured on dispute endpoints (provide-evidence, accept-claim, make-offer): the in-flight claim and retry-under-same-key design assume PayPal deduplicates on it for these calls.

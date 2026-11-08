@@ -234,3 +234,61 @@ describe("write client is unreachable from the agent", () => {
     expect(names).toEqual(["actions/approve.ts"]);
   });
 });
+
+describe("concurrent submission", () => {
+  function slowWriter(app: Awaited<ReturnType<typeof drafted>>["app"], fail = false) {
+    let outbound = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const writer = {
+      ...app.writer,
+      provideEvidence: async (...args: Parameters<typeof app.writer.provideEvidence>) => {
+        outbound++;
+        await gate;
+        if (fail) throw new PayPalError(503, "PAYPAL_UNAVAILABLE", "PayPal unavailable");
+        return app.writer.provideEvidence(...args);
+      },
+    };
+    return { writer, release, outbound: () => outbound };
+  }
+
+  it("sends once when approve x2 and submit arrive while the write is in flight", async () => {
+    const { app, draft } = await drafted("PP-D-1001");
+    const slow = slowWriter(app);
+    const deps = { db: app.db, writer: slow.writer, clock: app.clock };
+    const input = { draftId: draft.id, idempotencyKey: "race", ...decider };
+    const first = approveDraft(deps, input);
+    const second = approveDraft(deps, input);
+    const third = submitApproved(deps, draft.id);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(slow.outbound()).toBe(1);
+    slow.release();
+    const outcomes = await Promise.all([first, second, third]);
+    expect(slow.outbound()).toBe(1);
+    expect(app.mock.writeCount).toBe(1);
+    expect(outcomes.map((o) => o.status).sort()).toEqual(["in_flight", "in_flight", "ok"]);
+    const action = row<{ status: string; attempts: number }>(
+      app.db.prepare("SELECT status, attempts FROM actions").get(),
+    );
+    expect(action).toEqual({ status: "ok", attempts: 1 });
+  });
+
+  it("a late failure cannot overwrite a recorded success", async () => {
+    const { app, draft } = await drafted("PP-D-1001");
+    const slow = slowWriter(app, true);
+    const deps = { db: app.db, writer: slow.writer, clock: app.clock };
+    const pending = approveDraft(deps, { draftId: draft.id, idempotencyKey: "late", ...decider });
+    app.db
+      .prepare("UPDATE actions SET status = 'ok', response_json = '{\"status\":\"UNDER_REVIEW\"}'")
+      .run();
+    slow.release();
+    await pending;
+    const action = row<{ status: string; response_json: string }>(
+      app.db.prepare("SELECT status, response_json FROM actions").get(),
+    );
+    expect(action.status).toBe("ok");
+    expect(action.response_json).not.toContain("PAYPAL_UNAVAILABLE");
+  });
+});

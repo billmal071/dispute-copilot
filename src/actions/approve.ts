@@ -124,7 +124,7 @@ export function buildPayload(dispute: Dispute, draft: EvidenceDraft): Payload {
 export interface ApprovalOutcome {
   approvalId: number;
   actionId: number;
-  status: "ok" | "failed";
+  status: "ok" | "failed" | "in_flight";
   duplicate: boolean;
   response?: unknown;
   error?: string;
@@ -144,7 +144,7 @@ interface ActionRow {
   kind: ActionKind;
   request_json: string;
   response_json: string | null;
-  status: "pending" | "ok" | "failed";
+  status: "pending" | "in_flight" | "ok" | "failed";
   attempts: number;
   paypal_request_id: string;
 }
@@ -181,7 +181,21 @@ async function execute(
   const { db, writer, clock } = deps;
   const ts = () => clock.now().toISOString();
   const request = JSON.parse(action.request_json) as Payload["request"];
-  db.prepare("UPDATE actions SET attempts = attempts + 1 WHERE id = ?").run(action.id);
+  const claimed = db
+    .prepare(
+      "UPDATE actions SET status = 'in_flight', attempts = attempts + 1 WHERE id = ? AND status IN ('pending','failed')",
+    )
+    .run(action.id);
+  if (claimed.changes === 0) {
+    const current = actionFor(db, action.approval_id);
+    return {
+      approvalId: current.approval_id,
+      actionId: current.id,
+      status: current.status === "ok" ? "ok" : "in_flight",
+      duplicate: true,
+      response: current.response_json ? JSON.parse(current.response_json) : undefined,
+    };
+  }
   appendAudit(db, {
     actor: "system",
     event: "outbound_request",
@@ -213,10 +227,9 @@ async function execute(
               request as MakeOfferRequest,
               action.paypal_request_id,
             );
-    db.prepare("UPDATE actions SET status = 'ok', response_json = ? WHERE id = ?").run(
-      JSON.stringify(response),
-      action.id,
-    );
+    db.prepare(
+      "UPDATE actions SET status = 'ok', response_json = ? WHERE id = ? AND status = 'in_flight'",
+    ).run(JSON.stringify(response), action.id);
     db.prepare("UPDATE disputes SET status = ?, updated_at = ? WHERE paypal_id = ?").run(
       response.status,
       ts(),
@@ -238,10 +251,9 @@ async function execute(
     };
   } catch (err) {
     const message = err instanceof PayPalError ? `${err.code}: ${err.message}` : String(err);
-    db.prepare("UPDATE actions SET status = 'failed', response_json = ? WHERE id = ?").run(
-      JSON.stringify({ error: message }),
-      action.id,
-    );
+    db.prepare(
+      "UPDATE actions SET status = 'failed', response_json = ? WHERE id = ? AND status = 'in_flight'",
+    ).run(JSON.stringify({ error: message }), action.id);
     appendAudit(db, {
       actor: "paypal",
       event: "outbound_error",

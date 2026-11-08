@@ -19,3 +19,16 @@ Goal: a UI a judge remembers after a 3-minute video. It must look like a shipped
 ## Constraints
 
 Keep every server behaviour and security fix (CSRF token, draft id+version on approval, 127.0.0.1 binding). htmx plus server-rendered stays; no heavy SPA. No CDN. Keep all tests green and add tests for any new view logic. Verify visually with screenshots at 1440 and 390 widths, light and dark, and check the empty, error and loading states.
+
+## Final pass: web-launch-checklist (the user's skill; ~/.claude/skills/web-launch-checklist)
+
+The skill is Storytime and Next.js specific. Apply only the generic checks that fit this Hono app, and ignore every Storytime child-privacy override:
+
+- 1 custom 404 that renders the app layout and returns status 404
+- 2 primary action visible above the fold at 390x844 and 1440x900
+- 3 unique title and 50-160 char description per route
+- 5 favicon set, apple-touch-icon, web manifest, theme-color
+- 8 alt text (meaningful, or empty for decorative)
+- 9 loading and error states, no blank screen while the agent drafts
+- 12 html lang set
+  Mark 4, 6, 7, 10 and 11 not applicable for the local app, but set og tags and a title for the public README or demo page if one is made. Report the skill's pass/fail table with evidence.

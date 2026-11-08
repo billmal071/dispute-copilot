@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS actions (
   kind TEXT NOT NULL,
   request_json TEXT NOT NULL,
   response_json TEXT,
-  status TEXT NOT NULL CHECK (status IN ('pending','ok','failed')),
+  status TEXT NOT NULL CHECK (status IN ('pending','in_flight','ok','failed')),
   attempts INTEGER NOT NULL DEFAULT 0,
   paypal_request_id TEXT NOT NULL
 );
@@ -77,11 +77,28 @@ CREATE TABLE IF NOT EXISTS mock_requests (
 );
 `;
 
+function migrateActionStatus(db: Db): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'actions'").get() as
+    | { sql: string }
+    | undefined;
+  if (!row || row.sql.includes("in_flight")) return;
+  db.pragma("foreign_keys = OFF");
+  db.transaction(() => {
+    db.exec("ALTER TABLE actions RENAME TO actions_old");
+    db.exec(SCHEMA);
+    db.exec("INSERT INTO actions SELECT * FROM actions_old");
+    db.exec("DROP TABLE actions_old");
+  })();
+  db.pragma("foreign_keys = ON");
+}
+
 export function openDb(path: string): Db {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
+  migrateActionStatus(db);
+  db.prepare("UPDATE actions SET status = 'failed' WHERE status = 'in_flight'").run();
   return db;
 }

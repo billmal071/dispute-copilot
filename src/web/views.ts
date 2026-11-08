@@ -262,7 +262,9 @@ export function decisionPanel(
           ? h`<div class="callout ok"><strong>Submitted to PayPal${mode === "mock" ? " (mock)" : " sandbox"}.</strong> ${decision.decision === "edit" ? "Sent with your edits. " : ""}Dispute is now ${statusChip(String((a.response as { status?: string } | null)?.status ?? "OTHER"))}</div>
              <dl class="kv"><dt>Action</dt><dd class="mono">${a.kind}</dd><dt>PayPal-Request-Id</dt><dd class="mono">${a.request_id}</dd><dt>Attempts</dt><dd>${a.attempts}</dd></dl>
              <h3 style="margin-top:14px">PayPal response</h3><pre class="payload">${JSON.stringify(a.response, null, 2)}</pre>`
-          : h`<div class="callout error"><strong>PayPal did not accept the submission.</strong> ${errorText ?? ""} The draft is saved. Retrying reuses the same PayPal-Request-Id, so it cannot be applied twice.</div>
+          : a?.status === "in_flight"
+            ? h`<div class="callout info"><strong>Submission in progress.</strong> The request is with PayPal. Reload in a moment; it will not be sent twice.</div>`
+            : h`<div class="callout error"><strong>PayPal did not accept the submission.</strong> ${errorText ?? ""} The draft is saved. Retrying reuses the same PayPal-Request-Id, so it cannot be applied twice.</div>
              <form style="margin-top:12px" hx-post="/drafts/${draft.id}/approve" hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="find button">
                <input type="hidden" name="idempotency_key" value="${a?.request_id ?? ""}">
                <input type="hidden" name="draft_id" value="${draft.id}">
