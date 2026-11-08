@@ -16,7 +16,10 @@ async function setup() {
   let fetches = 0;
   const reader: ReadOnlyPayPalClient = {
     ...app.reader,
-    getDispute: (id) => (fetches++, app.reader.getDispute(id)),
+    getDispute: (id) => {
+      fetches += 1;
+      return app.reader.getDispute(id);
+    },
   };
   return { app, reader, fetches: () => fetches };
 }

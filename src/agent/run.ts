@@ -1,7 +1,7 @@
 import type { MerchantData } from "../merchant/data.js";
 import type { ReadOnlyPayPalClient } from "../paypal/client.js";
-import { EvidenceDraft, type ToolRun } from "../types.js";
-import type { ContentBlock, LLM, LLMMessage } from "./llm.js";
+import { type Dispute, EvidenceDraft, type ToolRun } from "../types.js";
+import type { ContentBlock, LLM, LLMMessage, LLMResponse } from "./llm.js";
 import { MODEL } from "./llm.js";
 import { type ScoreResult, scoreDraft } from "./score.js";
 import { executeReadTool, isReadTool, SUBMIT_TOOL, TOOL_DEFINITIONS } from "./tools.js";
@@ -59,7 +59,7 @@ function failure(
 export async function runAgent(input: AgentInput): Promise<AgentResult> {
   const { disputeId, reader, merchant, llm, now, onEvent } = input;
   const toolRuns: ToolRun[] = [];
-  let dispute;
+  let dispute: Dispute;
   try {
     dispute = await reader.getDispute(disputeId);
   } catch (err) {
@@ -73,7 +73,7 @@ export async function runAgent(input: AgentInput): Promise<AgentResult> {
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const forced = turn === MAX_TURNS - 1;
-    let response;
+    let response: LLMResponse;
     try {
       response = await llm.create({
         model: MODEL,

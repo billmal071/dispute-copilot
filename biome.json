@@ -1,5 +1,33 @@
 {
-  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
-  "files": { "includes": ["src/**", "test/**", "scripts/**", "*.json", "*.ts"] },
-  "linter": { "enabled": true, "rules": { "recommended": true } }
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/paypal/**", "src/agent/llm.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ],
+  "files": {
+    "includes": ["**", "!fixtures", "!dist", "!node_modules", "!data"]
+  },
+  "css": {
+    "linter": {
+      "enabled": false
+    }
+  }
 }
