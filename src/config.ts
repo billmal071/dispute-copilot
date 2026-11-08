@@ -34,9 +34,10 @@ export interface Config {
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const parsed = EnvSchema.parse(env);
   if (parsed.MODE === "sandbox") {
-    for (const key of ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"] as const) {
-      if (!parsed[key]) throw new Error(`MODE=sandbox requires ${key}`);
-    }
+    const missing = (["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"] as const).filter(
+      (key) => !parsed[key],
+    );
+    if (missing.length > 0) throw new Error(`MODE=sandbox requires ${missing.join(" and ")}`);
   }
   return {
     mode: parsed.MODE,

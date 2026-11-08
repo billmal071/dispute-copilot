@@ -1,17 +1,23 @@
-import { serve } from "@hono/node-server";
 import { createContext, initialSync } from "./app.js";
 import { loadConfig } from "./config.js";
+import { loadDotenv } from "./env.js";
+import { listen } from "./listen.js";
 import { createServer } from "./server.js";
 
-const config = loadConfig(process.env);
-const ctx = createContext(config);
-
 try {
-  await initialSync(ctx);
-} catch (err) {
-  console.warn(`Initial sync failed, starting with local data only: ${String(err)}`);
-}
+  loadDotenv();
+  const config = loadConfig(process.env);
+  const ctx = createContext(config);
 
-serve({ fetch: createServer(ctx).fetch, port: config.port, hostname: config.host }, (info) => {
+  try {
+    await initialSync(ctx);
+  } catch (err) {
+    console.warn(`Initial sync failed, starting with local data only: ${String(err)}`);
+  }
+
+  const info = await listen(createServer(ctx).fetch, config.port, config.host);
   console.log(`Dispute Copilot (${ctx.mode}) listening on http://${config.host}:${info.port}`);
-});
+} catch (err) {
+  console.error(`Cannot start: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(1);
+}
