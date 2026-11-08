@@ -1,0 +1,47 @@
+{
+  "key": "9f6b55751696209b3ee55143b79ac817bd702b3476ac1aa9d0136e66a3b9bf1e",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:31:44.266Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.7,
+          "dispute_reason_understood": "The buyer says the scarf is paler than pictured and wants a full refund.",
+          "missing_evidence": [],
+          "recommendation": "OFFER_PARTIAL",
+          "reasoning": "The listing for order LL-1008 states that natural dye shade varies by batch, and 20.00 USD (REF-1008-A) was already refunded on 2026-11-07. A further 12.00 USD refund is a fair settlement.",
+          "offer": {
+            "offer_type": "REFUND",
+            "amount": "12.00"
+          },
+          "evidences": [
+            {
+              "evidence_type": "PROOF_OF_REFUND",
+              "notes": "Partial refund REF-1008-A of 20.00 USD was issued on 2026-11-07 against transaction 5TX10080042.",
+              "refund_ids": [
+                "REF-1008-A"
+              ],
+              "source_refs": [
+                "transaction:5TX10080042"
+              ]
+            },
+            {
+              "evidence_type": "ITEM_DESCRIPTION",
+              "notes": "Order LL-1008 (transaction 5TX10080042, 64.00 USD) itemised \"Indigo cotton scarf\": Hand-dyed indigo cotton scarf, 70x180cm. Natural dye, shade varies by batch.. Listing notes that natural dye shade varies by batch.",
+              "source_refs": [
+                "order:LL-1008",
+                "transaction:5TX10080042"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "key": "e06194b8105fb72cff6b9221fc19dc68907503e93f3ee3c7821eaaf4b9240cbc",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:31:44.262Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.82,
+          "dispute_reason_understood": "The buyer says the fabric is not the linen that was listed.",
+          "missing_evidence": [],
+          "recommendation": "CONTEST",
+          "reasoning": "The order itemisation and the listing both describe 100% European flax linen, and the parcel was delivered and signed for on 2026-10-28. The buyer offers no evidence that the item differs from the listing.",
+          "evidences": [
+            {
+              "evidence_type": "ITEM_DESCRIPTION",
+              "notes": "Order LL-1004 (transaction 5TX10040042, 132.50 USD) itemised \"Flax linen duvet cover, sage\": 100% European flax linen duvet cover, 200x200cm, stonewashed, sage. Listing text and the packed item both state 100% European flax linen with a stonewashed finish.",
+              "source_refs": [
+                "order:LL-1004",
+                "transaction:5TX10040042"
+              ]
+            },
+            {
+              "evidence_type": "PROOF_OF_FULFILLMENT",
+              "notes": "Order LL-1004 (transaction 5TX10040042, 132.50 USD, paid 2026-10-22) shipped via DHL on 2026-10-23 with tracking JD0146100477. The carrier recorded delivery on 2026-10-28 to the shipping address on the PayPal transaction, signed for by Grace Mensah. Shipping policy: tracked, signature-confirmed service to the transaction address only.",
+              "tracking": {
+                "carrier": "DHL",
+                "number": "JD0146100477"
+              },
+              "source_refs": [
+                "tracking:5TX10040042",
+                "transaction:5TX10040042",
+                "order:LL-1004",
+                "policy:merchant"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "0af7f35c7940b510aac4d420704d2d09dd43c5b124268a495ff1a4870ec8e576",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:31:44.266Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_0_0",
+        "name": "get_dispute",
+        "input": {
+          "dispute_id": "PP-D-1008"
+        }
+      }
+    ]
+  }
+}

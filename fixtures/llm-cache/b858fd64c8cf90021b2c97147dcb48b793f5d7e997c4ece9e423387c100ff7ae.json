@@ -1,0 +1,25 @@
+{
+  "key": "b858fd64c8cf90021b2c97147dcb48b793f5d7e997c4ece9e423387c100ff7ae",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:31:44.264Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.9,
+          "dispute_reason_understood": "The buyer received two cups where the listing photo showed four.",
+          "missing_evidence": [],
+          "recommendation": "ACCEPT",
+          "accept_reason": "NOT_ABLE_TO_WIN",
+          "reasoning": "Order LL-1005 itemises a dripper with 2 cups, and our own listing note admits the photo showed four and was corrected on 2026-10-30. The buyer's complaint on transaction 5TX10050042 is substantiated.",
+          "evidences": []
+        }
+      }
+    ]
+  }
+}

@@ -170,3 +170,18 @@ describe("scoreDraft", () => {
     expect(r.total).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("scoreDraft contradiction scope", () => {
+  it("does not penalise accepting a duplicate charge just because delivery was signed", () => {
+    const r = scoreDraft({
+      ...base(),
+      dispute: dispute({ reason: "DUPLICATE_TRANSACTION" }),
+      draft: draft({
+        recommendation: "ACCEPT",
+        evidences: [],
+        reasoning: "Refund issued on 2026-11-08 for transaction TXN-1.",
+      }),
+    });
+    expect(r.penalties).toEqual([]);
+  });
+});

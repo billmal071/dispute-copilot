@@ -1,0 +1,39 @@
+{
+  "key": "fd5872141221dcd2338e2659739bb72b0f72ff7a301cff4a45a4e825b0653954",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:31:44.273Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.3,
+          "dispute_reason_understood": "The buyer says the parcel never arrived.",
+          "missing_evidence": [
+            "Carrier and tracking number for order LL-1013",
+            "Proof of shipment (carrier receipt or label)",
+            "Proof of delivery to the transaction address"
+          ],
+          "recommendation": "CONTEST",
+          "reasoning": "No tracking is on file for transaction 5TX10130042, so shipment cannot be proven from PayPal data. Contest only if the merchant can supply the carrier and tracking number; otherwise accept.",
+          "deadline_note": "Ask the merchant for tracking before the response deadline.",
+          "evidences": [
+            {
+              "evidence_type": "OTHER",
+              "notes": "Order LL-1013 (transaction 5TX10130042, 77.00 USD) was paid on 2026-10-25. Merchant to supply shipment proof.",
+              "source_refs": [
+                "transaction:5TX10130042",
+                "order:LL-1013",
+                "policy:merchant"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

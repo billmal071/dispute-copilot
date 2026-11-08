@@ -1,0 +1,41 @@
+{
+  "key": "f0fe51a210217648fba8293ec3d7b67fb540ee3986b251ed7d482a1acd43c3ec",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:31:44.266Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_1_0",
+        "name": "get_transaction",
+        "input": {
+          "transaction_id": "5TX10080042"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_1_1",
+        "name": "get_tracking",
+        "input": {
+          "transaction_id": "5TX10080042"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_1_2",
+        "name": "get_merchant_policies",
+        "input": {}
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_1_3",
+        "name": "list_prior_disputes_for_buyer",
+        "input": {
+          "buyer_id": "PB-1008"
+        }
+      }
+    ]
+  }
+}

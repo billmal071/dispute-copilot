@@ -1,0 +1,19 @@
+{
+  "key": "85e3c56a3bffa0b57fa99c075388620b1f3373652c225dc8693694872c329213",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:31:44.262Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_2_0",
+        "name": "get_order",
+        "input": {
+          "order_id": "LL-1004"
+        }
+      }
+    ]
+  }
+}

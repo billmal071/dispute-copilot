@@ -33,6 +33,8 @@ export const REQUIRED_EVIDENCE: Record<DisputeReason, EvidenceType[]> = {
   OTHER: ["OTHER"],
 };
 
+const DELIVERY_DECIDES: DisputeReason[] = ["MERCHANDISE_OR_SERVICE_NOT_RECEIVED", "UNAUTHORISED"];
+
 const HOURS_48 = 48 * 3600 * 1000;
 const ISO_DATE = /\d{4}-\d{2}-\d{2}/;
 
@@ -183,7 +185,11 @@ export function scoreDraft({ dispute, draft, toolRuns, now }: ScoreInput): Score
       points: -15,
       reason: "Contesting although the carrier reports the parcel lost or returned",
     });
-  } else if (draft.recommendation === "ACCEPT" && strongDelivery) {
+  } else if (
+    draft.recommendation === "ACCEPT" &&
+    strongDelivery &&
+    DELIVERY_DECIDES.includes(dispute.reason)
+  ) {
     penalties.push({
       key: "contradiction",
       points: -15,
