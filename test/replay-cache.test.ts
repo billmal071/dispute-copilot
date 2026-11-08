@@ -35,6 +35,8 @@ describe("recorded responses cover every seeded scenario", () => {
       expect(result.source).toBe("replayed");
       expect(result.draft?.recommendation).toBe(scenario.truth.expected_action);
       expect(result.score?.warnings).toEqual([]);
+      if (scenario.truth.expected_action !== "CONTEST")
+        expect(result.draft?.merchant_message?.trim()).toBeTruthy();
     },
   );
 

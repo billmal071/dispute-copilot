@@ -1,7 +1,7 @@
 {
   "key": "c66aace69b464909f203d0801bb45cd019f3bac45bd527a2f5cbb67c149d9811",
   "source": "scripted-fixture",
-  "recorded_at": "2026-11-08T00:52:24.368Z",
+  "recorded_at": "2026-11-08T00:53:20.312Z",
   "response": {
     "stop_reason": "tool_use",
     "model": "scripted-fixture",

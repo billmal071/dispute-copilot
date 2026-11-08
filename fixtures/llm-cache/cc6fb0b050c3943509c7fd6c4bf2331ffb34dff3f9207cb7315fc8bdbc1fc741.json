@@ -1,7 +1,7 @@
 {
   "key": "cc6fb0b050c3943509c7fd6c4bf2331ffb34dff3f9207cb7315fc8bdbc1fc741",
   "source": "scripted-fixture",
-  "recorded_at": "2026-11-08T00:52:24.362Z",
+  "recorded_at": "2026-11-08T00:53:20.304Z",
   "response": {
     "stop_reason": "tool_use",
     "model": "scripted-fixture",
@@ -16,6 +16,7 @@
           "missing_evidence": [],
           "recommendation": "OFFER_PARTIAL",
           "reasoning": "The listing for order LL-1008 states that natural dye shade varies by batch, and 20.00 USD (REF-1008-A) was already refunded on 2026-11-07. A further 12.00 USD refund is a fair settlement.",
+          "merchant_message": "Natural dye shades vary by batch. We already refunded 20.00 USD and are offering a further 12.00 USD to settle this.",
           "offer": {
             "offer_type": "REFUND",
             "amount": "12.00"

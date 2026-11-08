@@ -96,7 +96,7 @@ describe("drafting", () => {
     const empty = new ReplayLLM(new ResponseCache(mkdtempSync(join(tmpdir(), "empty-"))));
     const { server } = await setup({ llm: empty });
     const { html } = await draftFor(server);
-    expect(html).toContain("No recorded model response");
+    expect(html).toContain("No scripted fixture for this dispute state");
     expect(html).toContain("Retry");
   });
 });
@@ -146,6 +146,44 @@ describe("approval flow", () => {
     expect(app.calls).toHaveLength(0);
     const detail = await (await server.request("/disputes/PP-D-1001")).text();
     expect(detail).toContain("Rejected");
+  });
+});
+
+describe("failure modes", () => {
+  it("re-drafting after the dispute changed explains the missing fixture without internals", async () => {
+    const { server } = await setup();
+    await draftFor(server);
+    await server.request(
+      "/drafts/1/approve",
+      form({ idempotency_key: "k", draft_id: "1", draft_version: "1" }),
+    );
+    const { res, html } = await draftFor(server);
+    expect(res.status).toBe(200);
+    expect(html).toContain("No scripted fixture for this dispute state");
+    expect(html).toContain("ANTHROPIC_API_KEY");
+    expect(html).not.toMatch(/[0-9a-f]{12}|Error:|at .*\.ts/);
+  });
+
+  it("rejecting with a key already used elsewhere returns 409, not 500", async () => {
+    const { server } = await setup();
+    await draftFor(server, "PP-D-1001");
+    await draftFor(server, "PP-D-1002");
+    const first = await server.request("/drafts/1/reject", form({ idempotency_key: "same" }));
+    expect(first.status).toBe(200);
+    const second = await server.request("/drafts/2/reject", form({ idempotency_key: "same" }));
+    expect(second.status).toBe(409);
+  });
+
+  it("the fallback idempotency key carries a per-draft random component", async () => {
+    const { server, app } = await setup();
+    await draftFor(server);
+    await server.request("/drafts/1/approve", form({ draft_id: "1", draft_version: "1" }));
+    const row = app.db.prepare("SELECT idempotency_key FROM approvals").get() as {
+      idempotency_key: string;
+    };
+    expect(row.idempotency_key).toMatch(
+      /^draft-1-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
   });
 });
 

@@ -349,7 +349,7 @@ export function createServer(ctx: AppContext): Server {
     const key =
       typeof form.idempotency_key === "string" && form.idempotency_key
         ? form.idempotency_key
-        : `draft-${draftId}`;
+        : `draft-${draftId}-${randomUUID()}`;
     const { edited } = applyEdits(stored.draft, form);
     const draftVersion = Number(form.draft_version);
     if (!Number.isInteger(draftVersion) || Number(form.draft_id) !== draftId)
@@ -399,15 +399,21 @@ export function createServer(ctx: AppContext): Server {
     const key =
       typeof form.idempotency_key === "string" && form.idempotency_key
         ? form.idempotency_key
-        : `reject-${draftId}`;
+        : `reject-${draftId}-${randomUUID()}`;
     try {
       await rejectDraft(approvalDeps(), { draftId, idempotencyKey: key, decidedBy: DECIDER });
     } catch (err) {
       if (!(err instanceof AlreadyDecidedError)) throw err;
     }
-    if (!isHtmx(c)) return c.redirect(`/disputes/${stored.dispute_id}`, 303);
     const decision = loadDecision(ctx, draftId);
-    if (!decision) throw new Error("decision missing after rejection");
+    if (!decision)
+      return c.html(
+        errorFragment(
+          "That request key was already used for another decision. Reload and try again.",
+        ).toString(),
+        409,
+      );
+    if (!isHtmx(c)) return c.redirect(`/disputes/${stored.dispute_id}`, 303);
     return c.html(decisionPanel(stored, decision, ctx.mode).toString());
   });
 

@@ -59,7 +59,13 @@ export type Payload =
 const MAX_NOTES = 2000;
 
 export function buildPayload(dispute: Dispute, draft: EvidenceDraft): Payload {
-  const note = (draft.merchant_message ?? draft.reasoning).slice(0, MAX_NOTES);
+  const note = (draft.merchant_message ?? "").trim().slice(0, MAX_NOTES);
+  const requireNote = () => {
+    if (note.length === 0)
+      throw new ValidationError(
+        "Write a message to PayPal before approving. The agent's internal reasoning is never sent.",
+      );
+  };
   switch (draft.recommendation) {
     case "CONTEST": {
       if (draft.evidences.length === 0)
@@ -97,11 +103,13 @@ export function buildPayload(dispute: Dispute, draft: EvidenceDraft): Payload {
       };
     }
     case "ACCEPT":
+      requireNote();
       return {
         kind: "accept-claim",
         request: { note, accept_claim_reason: draft.accept_reason ?? "REASON_NOT_SET" },
       };
     case "OFFER_PARTIAL": {
+      requireNote();
       if (!draft.offer)
         throw new ValidationError("A partial offer needs an offer type and amount.");
       if (!(Number(draft.offer.amount) > 0))
@@ -387,7 +395,10 @@ export async function rejectDraft(
 ): Promise<{ approvalId: number }> {
   const { db, clock } = deps;
   const draft = loadDraftOrThrow(db, input.draftId);
-  if (db.prepare("SELECT 1 FROM approvals WHERE draft_id = ?").get(input.draftId))
+  if (
+    db.prepare("SELECT 1 FROM approvals WHERE draft_id = ?").get(input.draftId) ||
+    db.prepare("SELECT 1 FROM approvals WHERE idempotency_key = ?").get(input.idempotencyKey)
+  )
     throw new AlreadyDecidedError(input.draftId);
   const decidedAt = clock.now().toISOString();
   return db.transaction(() => {

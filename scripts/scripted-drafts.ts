@@ -90,6 +90,8 @@ const DRAFTS: Record<string, Builder> = {
       dispute_reason_understood: "The buyer says the parcel never arrived.",
       accept_reason: "NOT_ABLE_TO_WIN",
       reasoning: `Carrier tracking shows delivery on ${day(s.tracking?.delivered_at)} to ${s.tracking?.delivery_address?.line1}, but the PayPal transaction ${s.transaction.id} lists ${s.transaction.shipping_address?.line1}. Delivery to a different address does not satisfy proof of delivery, so contesting will fail.`,
+      merchant_message:
+        "We are sorry the parcel did not reach you at your address. We are refunding you in full.",
       evidences: [],
     }),
   "not-as-described-listing-matches": (s) =>
@@ -107,6 +109,8 @@ const DRAFTS: Record<string, Builder> = {
       dispute_reason_understood: "The buyer received two cups where the listing photo showed four.",
       accept_reason: "NOT_ABLE_TO_WIN",
       reasoning: `Order ${s.order.id} itemises a dripper with 2 cups, and our own listing note admits the photo showed four and was corrected on 2026-10-30. The buyer's complaint on transaction ${s.transaction.id} is substantiated.`,
+      merchant_message:
+        "You are right that the listing photo showed more than we sent. We are refunding you in full and have corrected the listing.",
       evidences: [],
     }),
   "unauthorized-strong-fulfillment": (s) =>
@@ -132,6 +136,8 @@ const DRAFTS: Record<string, Builder> = {
       dispute_reason_understood: "The buyer was charged twice for the same order.",
       accept_reason: "REASON_NOT_SET",
       reasoning: `Transaction ${s.transaction.id} was already refunded in full (${s.transaction.refunds[0]?.id}, ${s.transaction.amount.value} USD on ${day(s.transaction.refunds[0]?.created)}). Accept so the dispute closes in the buyer's favour without a second payout.`,
+      merchant_message:
+        "This charge was already refunded in full. We are closing the dispute in your favour so you are not refunded twice.",
       evidences: [],
     }),
   "partial-refund-buyer-wants-full": (s) =>
@@ -141,6 +147,8 @@ const DRAFTS: Record<string, Builder> = {
       dispute_reason_understood:
         "The buyer says the scarf is paler than pictured and wants a full refund.",
       reasoning: `The listing for order ${s.order.id} states that natural dye shade varies by batch, and 20.00 USD (${s.transaction.refunds[0]?.id}) was already refunded on ${day(s.transaction.refunds[0]?.created)}. A further 12.00 USD refund is a fair settlement.`,
+      merchant_message:
+        "Natural dye shades vary by batch. We already refunded 20.00 USD and are offering a further 12.00 USD to settle this.",
       offer: { offer_type: "REFUND", amount: "12.00" },
       evidences: [
         {

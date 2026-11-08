@@ -14,6 +14,7 @@ import { createDraft } from "../src/agent/draft.js";
 import { listAudit, verifyChain } from "../src/audit.js";
 import { PayPalError } from "../src/paypal/client.js";
 import { makeApp } from "./app-helpers.js";
+import { dispute, draft } from "./helpers.js";
 
 async function drafted(disputeId: string) {
   const app = await makeApp();
@@ -205,6 +206,36 @@ describe("approval gate", () => {
     const payload = buildPayload(JSON.parse(dispute.raw_json), draft.draft);
     expect(payload.kind).toBe("provide-evidence");
     expect(JSON.stringify(payload.request)).toContain("tracking_info");
+  });
+});
+
+describe("note sent to PayPal for ACCEPT and OFFER", () => {
+  const d = dispute();
+  const secret = "INTERNAL: contesting will fail, buyer is probably right";
+
+  it("refuses to send the agent's internal reasoning when there is no merchant message", () => {
+    const accept = draft({ recommendation: "ACCEPT", reasoning: secret, evidences: [] });
+    expect(() => buildPayload(d, accept)).toThrow(ValidationError);
+    const offer = draft({
+      recommendation: "OFFER_PARTIAL",
+      reasoning: secret,
+      evidences: [],
+      offer: { offer_type: "REFUND", amount: "10.00" },
+    });
+    expect(() => buildPayload(d, offer)).toThrow(ValidationError);
+    expect(() => buildPayload(d, { ...accept, merchant_message: "   " })).toThrow(ValidationError);
+  });
+
+  it("sends only the merchant message as the note", () => {
+    const accept = draft({
+      recommendation: "ACCEPT",
+      reasoning: secret,
+      evidences: [],
+      merchant_message: "We are refunding you in full.",
+    });
+    const payload = buildPayload(d, accept);
+    expect(JSON.stringify(payload)).toContain("We are refunding you in full.");
+    expect(JSON.stringify(payload)).not.toContain("INTERNAL");
   });
 });
 

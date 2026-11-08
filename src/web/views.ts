@@ -331,8 +331,8 @@ export function draftPanel(
       : ""
   }
   ${
-    d.recommendation !== "CONTEST" && d.merchant_message
-      ? h`<div class="block field"><h3>Message to PayPal</h3><textarea name="merchant_message" readonly maxlength="2000" aria-label="Message to PayPal">${d.merchant_message}</textarea></div>`
+    d.recommendation !== "CONTEST"
+      ? h`<div class="block field"><h3>Message to PayPal</h3><textarea name="merchant_message" readonly maxlength="2000" aria-label="Message to PayPal">${d.merchant_message ?? ""}</textarea></div>`
       : ""
   }
   ${

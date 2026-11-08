@@ -46,7 +46,7 @@ export interface LLM {
 export class ReplayMissError extends Error {
   constructor(readonly key: string) {
     super(
-      `No recorded model response for this input (${key.slice(0, 12)}). Set ANTHROPIC_API_KEY to call the model, or run npm run cache:build.`,
+      "No scripted fixture for this dispute state. Add ANTHROPIC_API_KEY to draft it with a live model.",
     );
     this.name = "ReplayMissError";
   }

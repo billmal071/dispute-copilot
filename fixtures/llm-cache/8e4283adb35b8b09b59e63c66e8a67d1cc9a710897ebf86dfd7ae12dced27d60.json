@@ -1,7 +1,7 @@
 {
   "key": "8e4283adb35b8b09b59e63c66e8a67d1cc9a710897ebf86dfd7ae12dced27d60",
   "source": "scripted-fixture",
-  "recorded_at": "2026-11-08T00:52:24.361Z",
+  "recorded_at": "2026-11-08T00:53:20.303Z",
   "response": {
     "stop_reason": "tool_use",
     "model": "scripted-fixture",
@@ -17,6 +17,7 @@
           "recommendation": "ACCEPT",
           "accept_reason": "REASON_NOT_SET",
           "reasoning": "Transaction 5TX10070042 was already refunded in full (REF-1007-A, 38.00 USD on 2026-11-08). Accept so the dispute closes in the buyer's favour without a second payout.",
+          "merchant_message": "This charge was already refunded in full. We are closing the dispute in your favour so you are not refunded twice.",
           "evidences": []
         }
       }
