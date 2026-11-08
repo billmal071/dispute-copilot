@@ -104,4 +104,29 @@ describe("webhook intake", () => {
       .get() as { status: string };
     expect(stored.status).toBe("failed");
   });
+
+  it("reprocesses a redelivered event whose first processing failed", async () => {
+    const { app } = await setup();
+    let down = true;
+    const reader: ReadOnlyPayPalClient = {
+      ...app.reader,
+      getDispute: async (id) => {
+        if (down) throw new Error("boom");
+        return app.reader.getDispute(id);
+      },
+    };
+    const deps = { db: app.db, reader, clock: app.clock, verify: accept };
+    const first = await handleWebhook(deps, { headers: {}, event: event("WH-5") });
+    if (first.status === "accepted") await first.processing;
+    down = false;
+    const second = await handleWebhook(deps, { headers: {}, event: event("WH-5") });
+    expect(second.status).toBe("accepted");
+    if (second.status === "accepted") await second.processing;
+    const stored = app.db
+      .prepare("SELECT status FROM webhook_events WHERE event_id = 'WH-5'")
+      .get() as { status: string };
+    expect(stored.status).toBe("processed");
+    const third = await handleWebhook(deps, { headers: {}, event: event("WH-5") });
+    expect(third.status).toBe("duplicate");
+  });
 });

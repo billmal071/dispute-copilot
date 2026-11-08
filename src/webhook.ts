@@ -64,7 +64,14 @@ export async function handleWebhook(
       "INSERT OR IGNORE INTO webhook_events (event_id, type, received_at, status) VALUES (?, ?, ?, 'received')",
     )
     .run(event.id, event.event_type, ts());
-  if (inserted.changes === 0) {
+  const retried =
+    inserted.changes === 0 &&
+    db
+      .prepare(
+        "UPDATE webhook_events SET status = 'received', processed_at = NULL WHERE event_id = ? AND status = 'failed'",
+      )
+      .run(event.id).changes === 1;
+  if (inserted.changes === 0 && !retried) {
     appendAudit(db, {
       actor: "system",
       event: "webhook_duplicate_ignored",
