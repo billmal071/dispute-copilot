@@ -59,6 +59,11 @@ CREATE TABLE IF NOT EXISTS audit (
   prev_hash TEXT NOT NULL,
   hash TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS audit_head (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  count INTEGER NOT NULL,
+  head_hash TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS webhook_events (
   event_id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
@@ -99,6 +104,8 @@ export function openDb(path: string): Db {
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
   migrateActionStatus(db);
+  db.exec(`INSERT OR IGNORE INTO audit_head (id, count, head_hash)
+    SELECT 1, (SELECT COUNT(*) FROM audit), COALESCE((SELECT hash FROM audit ORDER BY id DESC LIMIT 1), '${"0".repeat(64)}')`);
   db.prepare("UPDATE actions SET status = 'failed' WHERE status = 'in_flight'").run();
   return db;
 }

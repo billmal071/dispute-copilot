@@ -60,6 +60,9 @@ export function appendAudit(db: Db, input: AuditInput): AuditRow {
         "INSERT INTO audit (ts, actor, event, dispute_id, payload_json, prev_hash, hash) VALUES (@ts, @actor, @event, @dispute_id, @payload_json, @prev_hash, @hash)",
       )
       .run({ ...partial, prev_hash, hash });
+    db.prepare(
+      "INSERT INTO audit_head (id, count, head_hash) VALUES (1, 1, ?) ON CONFLICT(id) DO UPDATE SET count = count + 1, head_hash = excluded.head_hash",
+    ).run(hash);
     return { id: Number(info.lastInsertRowid), ...partial, prev_hash, hash };
   });
   return append();
@@ -88,6 +91,12 @@ export function verifyChain(db: Db): ChainResult {
       return { ok: false, length: rows.length, brokenAt: row.id };
     }
     prev = row.hash;
+  }
+  const head = db.prepare("SELECT count, head_hash FROM audit_head WHERE id = 1").get() as
+    | { count: number; head_hash: string }
+    | undefined;
+  if (!head || head.count !== rows.length || head.head_hash !== prev) {
+    return { ok: false, length: rows.length, brokenAt: rows.length + 1 };
   }
   return { ok: true, length: rows.length };
 }

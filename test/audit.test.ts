@@ -55,6 +55,20 @@ describe("audit chain", () => {
     expect(result.brokenAt).toBe(3);
   });
 
+  it("detects truncation of the last rows by checking the anchored head", () => {
+    for (let i = 0; i < 5; i++) {
+      appendAudit(db, { actor: "system", event: "e", disputeId: null, payload: { i }, ts: at(i) });
+    }
+    db.prepare("DELETE FROM audit WHERE id > 3").run();
+    expect(verifyChain(db)).toEqual({ ok: false, length: 3, brokenAt: 4 });
+  });
+
+  it("detects removal of every row", () => {
+    appendAudit(db, { actor: "system", event: "e", disputeId: null, payload: {}, ts: at(0) });
+    db.prepare("DELETE FROM audit").run();
+    expect(verifyChain(db).ok).toBe(false);
+  });
+
   it("hashes payloads independent of key order", () => {
     const a = appendAudit(db, {
       actor: "system",
