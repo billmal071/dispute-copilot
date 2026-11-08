@@ -39,3 +39,12 @@ document.addEventListener("input", (e) => {
 document.addEventListener("htmx:afterSwap", (e) => growAll(e.target));
 window.addEventListener("load", () => growAll(document));
 document.addEventListener("DOMContentLoaded", () => growAll(document));
+
+document.addEventListener("htmx:afterSwap", (e) => {
+  if (e.target.id !== "draft-panel" && e.detail.target?.id !== "draft-panel") return;
+  const slot = document.getElementById("modal-slot");
+  const dialog = slot?.querySelector("dialog");
+  if (dialog?.open) dialog.close();
+  if (slot) slot.innerHTML = "";
+  document.getElementById("draft-panel")?.scrollIntoView({ block: "nearest" });
+});

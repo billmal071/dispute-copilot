@@ -1146,12 +1146,12 @@ mark.hl {
 .gauge.none {
   --tone: var(--muted);
 }
-.gauge svg {
+.gauge > svg {
   width: 100%;
   height: 100%;
   overflow: visible;
 }
-.gauge circle {
+.gauge > svg circle {
   fill: none;
   stroke-width: 13;
   stroke-linecap: round;
@@ -1399,7 +1399,7 @@ mark.hl {
   display: block;
   height: 100%;
   width: var(--w);
-  background: var(--ink);
+  background: var(--ink-2);
   border-radius: 3px;
   animation: grow 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.25s both;
 }
@@ -1564,7 +1564,7 @@ pre {
   padding-left: 26px;
   color: var(--ink-2);
   opacity: 0;
-  animation: rise 0.5s ease both;
+  animation: step-in 0.5s ease forwards;
   animation-delay: calc(var(--i) * 0.9s);
 }
 .steps li::before {
@@ -1948,6 +1948,16 @@ dialog.sheet form {
     transform: translateY(10px);
   }
 }
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 @keyframes grow {
   from {
     width: 0;
@@ -2096,17 +2106,58 @@ dialog.sheet form {
   }
   .case {
     padding: 14px var(--s4);
+    grid-template-areas:
+      "ring main amount"
+      "ring win win"
+      "ring state state";
+  }
+  .case-state {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px var(--s3);
+  }
+  .list-head {
+    flex-direction: column;
+    gap: 2px;
   }
   .kv {
     grid-template-columns: 96px minmax(0, 1fr);
   }
   .verdict {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: var(--s3);
+    padding-top: var(--s3);
+    padding-bottom: var(--s3);
   }
-  .verdict-text {
-    align-items: center;
+  .gauge {
+    width: 132px;
+    height: 132px;
+  }
+  .g-num {
+    font-size: 2.3rem;
+  }
+  .g-num small {
+    font-size: 1rem;
+  }
+  .g-label {
+    font-size: 0.56rem;
+  }
+  .g-tone {
+    font-size: 0.7rem;
+    padding: 1px 8px;
+  }
+  .rec-value {
+    font-size: 1.9rem;
+  }
+  .verdict-text .sub {
+    display: none;
+  }
+  .fixture-note {
+    font-size: 0.76rem;
+  }
+  .actions {
+    padding: var(--s3);
   }
   .draft-top,
   .block {

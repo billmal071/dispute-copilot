@@ -297,7 +297,7 @@ function caseFile(ev: EvidenceView, now: Date): Safe {
   const match =
     txn && tracking ? sameAddress(txn.shipping_address, tracking.delivery_address) : null;
   return h`
-<p class="legend"><mark class="hl">Highlighted</mark> facts decide a ${REASON_LABEL[d.reason].toLowerCase()} dispute.</p>
+<p class="legend"><mark class="hl">Highlighted</mark> facts are the ones that decide this kind of dispute.</p>
 <section class="exhibit" aria-labelledby="ex-a">
   <header><span class="ex-tag">A</span><h2 id="ex-a">Buyer claim</h2>${statusChip(d.status)}</header>
   <dl class="kv">
