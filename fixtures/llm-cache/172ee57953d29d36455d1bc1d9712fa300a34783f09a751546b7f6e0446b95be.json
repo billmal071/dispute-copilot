@@ -1,0 +1,25 @@
+{
+  "key": "172ee57953d29d36455d1bc1d9712fa300a34783f09a751546b7f6e0446b95be",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.359Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.9,
+          "dispute_reason_understood": "The buyer received two cups where the listing photo showed four.",
+          "missing_evidence": [],
+          "recommendation": "ACCEPT",
+          "accept_reason": "NOT_ABLE_TO_WIN",
+          "reasoning": "Order LL-1005 itemises a dripper with 2 cups, and our own listing note admits the photo showed four and was corrected on 2026-10-30. The buyer's complaint on transaction 5TX10050042 is substantiated.",
+          "evidences": []
+        }
+      }
+    ]
+  }
+}

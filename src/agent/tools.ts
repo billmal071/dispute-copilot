@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { MerchantData } from "../merchant/data.js";
 import { PayPalError, type ReadOnlyPayPalClient } from "../paypal/client.js";
-import { EvidenceDraft, type ToolRun } from "../types.js";
+import { type Dispute, EvidenceDraft, type ToolRun, type Transaction } from "../types.js";
 import type { LLMTool } from "./llm.js";
 
 export const SUBMIT_TOOL = "submit_recommendation";
@@ -66,14 +66,26 @@ export const TOOL_DEFINITIONS: LLMTool[] = [
 const BUYER_OPEN = "<untrusted_buyer_message>";
 const BUYER_CLOSE = "</untrusted_buyer_message>";
 
-function wrapBuyerMessages<T extends { messages: { posted_by: string; content: string }[] }>(
-  dispute: T,
-): T {
+const wrapBuyerText = (text: string): string =>
+  `${BUYER_OPEN}${text.replace(/<(\/?)untrusted_buyer_message/gi, "&lt;$1untrusted_buyer_message")}${BUYER_CLOSE}`;
+
+function wrapBuyerFields(dispute: Dispute): Dispute {
   return {
     ...dispute,
+    disputed_transactions: dispute.disputed_transactions.map((t) => ({
+      ...t,
+      buyer: { ...t.buyer, name: wrapBuyerText(t.buyer.name) },
+    })),
     messages: dispute.messages.map((m) =>
-      m.posted_by === "BUYER" ? { ...m, content: `${BUYER_OPEN}${m.content}${BUYER_CLOSE}` } : m,
+      m.posted_by === "BUYER" ? { ...m, content: wrapBuyerText(m.content) } : m,
     ),
+  };
+}
+
+function wrapTransactionBuyer(t: Transaction): Transaction {
+  return {
+    ...t,
+    buyer: { ...t.buyer, name: wrapBuyerText(t.buyer.name), email: wrapBuyerText(t.buyer.email) },
   };
 }
 
@@ -105,12 +117,12 @@ export async function executeReadTool(
       case "get_dispute": {
         const d = await reader.getDispute(id("dispute_id"));
         const ref = `dispute:${d.dispute_id}`;
-        return { name, input, ref, output: { ref, ...wrapBuyerMessages(d) }, is_error: false };
+        return { name, input, ref, output: { ref, ...wrapBuyerFields(d) }, is_error: false };
       }
       case "get_transaction": {
         const t = await reader.getTransaction(id("transaction_id"));
         const ref = `transaction:${t.id}`;
-        return { name, input, ref, output: { ref, ...t }, is_error: false };
+        return { name, input, ref, output: { ref, ...wrapTransactionBuyer(t) }, is_error: false };
       }
       case "get_order": {
         const o = await reader.getOrder(id("order_id"));

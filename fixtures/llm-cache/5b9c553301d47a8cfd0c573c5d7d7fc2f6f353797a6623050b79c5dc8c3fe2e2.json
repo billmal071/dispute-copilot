@@ -1,0 +1,46 @@
+{
+  "key": "5b9c553301d47a8cfd0c573c5d7d7fc2f6f353797a6623050b79c5dc8c3fe2e2",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.352Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.93,
+          "dispute_reason_understood": "The buyer says the parcel never arrived.",
+          "missing_evidence": [],
+          "recommendation": "CONTEST",
+          "reasoning": "Carrier tracking shows delivery on 2026-10-25 signed by the buyer at the exact address on the PayPal transaction. This is strong proof of delivery.",
+          "evidences": [
+            {
+              "evidence_type": "PROOF_OF_FULFILLMENT",
+              "notes": "Order LL-1001 (transaction 5TX10010042, 89.00 USD, paid 2026-10-19) shipped via DHL on 2026-10-20 with tracking JD0146100177. The carrier recorded delivery on 2026-10-25 to the shipping address on the PayPal transaction, signed for by Ada Obi. Shipping policy: tracked, signature-confirmed service to the transaction address only.",
+              "tracking": {
+                "carrier": "DHL",
+                "number": "JD0146100177"
+              },
+              "source_refs": [
+                "tracking:5TX10010042",
+                "transaction:5TX10010042",
+                "order:LL-1001",
+                "policy:merchant"
+              ]
+            },
+            {
+              "evidence_type": "PROOF_OF_DELIVERY_SIGNATURE",
+              "notes": "Carrier DHL confirms delivery of order LL-1001 on 2026-10-25 with a signature from Ada Obi.",
+              "source_refs": [
+                "tracking:5TX10010042"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

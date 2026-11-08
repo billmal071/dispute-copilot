@@ -1,0 +1,54 @@
+{
+  "key": "ad9c2e809d650fe552766867702d4af3be66f3e6d78de7edcd48871371ba2a9a",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.360Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.88,
+          "dispute_reason_understood": "The buyer says they did not authorise the purchase.",
+          "missing_evidence": [],
+          "recommendation": "CONTEST",
+          "reasoning": "The order shipped to the buyer's address on file, was signed for on 2026-10-26, and the buyer has 3 earlier completed orders with this merchant and no prior disputes.",
+          "evidences": [
+            {
+              "evidence_type": "PROOF_OF_FULFILLMENT",
+              "notes": "Order LL-1006 (transaction 5TX10060042, 249.00 USD, paid 2026-10-20) shipped via DHL on 2026-10-21 with tracking JD0146100677. The carrier recorded delivery on 2026-10-26 to the shipping address on the PayPal transaction, signed for by Ngozi Adeyemi. Shipping policy: tracked, signature-confirmed service to the transaction address only.",
+              "tracking": {
+                "carrier": "DHL",
+                "number": "JD0146100677"
+              },
+              "source_refs": [
+                "tracking:5TX10060042",
+                "transaction:5TX10060042",
+                "order:LL-1006",
+                "policy:merchant"
+              ]
+            },
+            {
+              "evidence_type": "OTHER",
+              "notes": "Buyer Ngozi Adeyemi has 3 prior completed orders with us and no earlier disputes. Order LL-1006 (transaction 5TX10060042) went to the same address as those orders.",
+              "source_refs": [
+                "prior:PB-1006",
+                "transaction:5TX10060042"
+              ]
+            },
+            {
+              "evidence_type": "PROOF_OF_DELIVERY_SIGNATURE",
+              "notes": "Carrier DHL confirms delivery of order LL-1006 on 2026-10-26 with a signature from Ngozi Adeyemi.",
+              "source_refs": [
+                "tracking:5TX10060042"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

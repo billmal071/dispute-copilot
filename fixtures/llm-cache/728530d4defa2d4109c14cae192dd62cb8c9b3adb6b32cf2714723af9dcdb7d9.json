@@ -1,0 +1,19 @@
+{
+  "key": "728530d4defa2d4109c14cae192dd62cb8c9b3adb6b32cf2714723af9dcdb7d9",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.368Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_2_0",
+        "name": "get_order",
+        "input": {
+          "order_id": "LL-1012"
+        }
+      }
+    ]
+  }
+}

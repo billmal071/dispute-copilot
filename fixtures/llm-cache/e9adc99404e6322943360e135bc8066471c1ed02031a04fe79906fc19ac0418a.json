@@ -1,0 +1,26 @@
+{
+  "key": "e9adc99404e6322943360e135bc8066471c1ed02031a04fe79906fc19ac0418a",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.355Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.95,
+          "dispute_reason_understood": "The buyer says the parcel never arrived.",
+          "missing_evidence": [],
+          "recommendation": "ACCEPT",
+          "accept_reason": "LOST_IN_MAIL",
+          "reasoning": "Tracking for transaction 5TX10020042 (order LL-1002) is marked LOST by the carrier and there is no delivery scan or signature. There is nothing to contest with; accept and refund 54.00 USD.",
+          "evidences": [],
+          "merchant_message": "We are sorry the parcel was lost in transit. We are refunding you in full."
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "key": "e3b7fcb0b31b253307b8166dc38378749abe7194f712befe464ae41e83a317d4",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.365Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.86,
+          "dispute_reason_understood": "The buyer says they cancelled the subscription but were still billed.",
+          "missing_evidence": [],
+          "recommendation": "CONTEST",
+          "reasoning": "The renewal was charged on 2026-10-01. Access logs show the buyer logged in and downloaded patterns in the following weeks, and the cancellation request only arrived on 2026-10-17, after the renewal.",
+          "evidences": [
+            {
+              "evidence_type": "PROOF_OF_FULFILLMENT",
+              "notes": "Subscription order LL-1010 (transaction 5TX10100042, 19.00 USD) renewed on 2026-10-01. Access logs record a login on 2026-10-03 and pattern downloads on 2026-10-08 and 2026-10-14.",
+              "source_refs": [
+                "transaction:5TX10100042",
+                "order:LL-1010",
+                "policy:merchant"
+              ]
+            },
+            {
+              "evidence_type": "OTHER",
+              "notes": "Terms of service: cancellation must be requested before the renewal date and applies from the next period. The buyer's cancellation was requested on 2026-10-17, after the 2026-10-01 renewal on transaction 5TX10100042.",
+              "source_refs": [
+                "policy:merchant",
+                "transaction:5TX10100042"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "key": "1eb0b67b5934e55466e3ec2d058c945b98a38728469cf9c35371f7fce9f135cd",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.356Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_1_0",
+        "name": "get_transaction",
+        "input": {
+          "transaction_id": "5TX10030042"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_1_1",
+        "name": "get_tracking",
+        "input": {
+          "transaction_id": "5TX10030042"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_1_2",
+        "name": "get_merchant_policies",
+        "input": {}
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_1_3",
+        "name": "list_prior_disputes_for_buyer",
+        "input": {
+          "buyer_id": "PB-1003"
+        }
+      }
+    ]
+  }
+}

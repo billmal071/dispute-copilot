@@ -1,0 +1,25 @@
+{
+  "key": "8e4283adb35b8b09b59e63c66e8a67d1cc9a710897ebf86dfd7ae12dced27d60",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.361Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.92,
+          "dispute_reason_understood": "The buyer was charged twice for the same order.",
+          "missing_evidence": [],
+          "recommendation": "ACCEPT",
+          "accept_reason": "REASON_NOT_SET",
+          "reasoning": "Transaction 5TX10070042 was already refunded in full (REF-1007-A, 38.00 USD on 2026-11-08). Accept so the dispute closes in the buyer's favour without a second payout.",
+          "evidences": []
+        }
+      }
+    ]
+  }
+}

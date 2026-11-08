@@ -1,0 +1,25 @@
+{
+  "key": "978784cfbd3f03e28cbec682730ff3b99baf9cf31a830caf08c626e03ee881ad",
+  "source": "scripted-fixture",
+  "recorded_at": "2026-11-08T00:52:24.356Z",
+  "response": {
+    "stop_reason": "tool_use",
+    "model": "scripted-fixture",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_scripted_3_0",
+        "name": "submit_recommendation",
+        "input": {
+          "confidence": 0.9,
+          "dispute_reason_understood": "The buyer says the parcel never arrived.",
+          "missing_evidence": [],
+          "recommendation": "ACCEPT",
+          "accept_reason": "NOT_ABLE_TO_WIN",
+          "reasoning": "Carrier tracking shows delivery on 2026-10-27 to Unit 2, 40 Harbour Way, but the PayPal transaction 5TX10030042 lists Flat 4, 8 Kings Road. Delivery to a different address does not satisfy proof of delivery, so contesting will fail.",
+          "evidences": []
+        }
+      }
+    ]
+  }
+}
