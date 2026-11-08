@@ -12,6 +12,6 @@ try {
   console.warn(`Initial sync failed, starting with local data only: ${String(err)}`);
 }
 
-serve({ fetch: createServer(ctx).fetch, port: config.port }, (info) => {
-  console.log(`Dispute Copilot (${ctx.mode}) listening on http://localhost:${info.port}`);
+serve({ fetch: createServer(ctx).fetch, port: config.port, hostname: config.host }, (info) => {
+  console.log(`Dispute Copilot (${ctx.mode}) listening on http://${config.host}:${info.port}`);
 });

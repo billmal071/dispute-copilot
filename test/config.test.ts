@@ -9,6 +9,11 @@ describe("loadConfig", () => {
     expect(cfg.anthropicApiKey).toBeUndefined();
   });
 
+  it("binds to loopback unless HOST says otherwise", () => {
+    expect(loadConfig({}).host).toBe("127.0.0.1");
+    expect(loadConfig({ HOST: "0.0.0.0" }).host).toBe("0.0.0.0");
+  });
+
   it("treats empty strings from a copied .env.example as unset", () => {
     const cfg = loadConfig({ MODE: "mock", ANTHROPIC_API_KEY: "", PAYPAL_CLIENT_ID: "" });
     expect(cfg.anthropicApiKey).toBeUndefined();

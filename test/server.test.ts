@@ -6,11 +6,13 @@ import { ReplayLLM, ResponseCache } from "../src/agent/llm.js";
 import type { AppContext } from "../src/app.js";
 import { createServer } from "../src/server.js";
 import { makeApp } from "./app-helpers.js";
+import { startSession, withSession } from "./csrf-helpers.js";
 
 async function setup(over: Partial<AppContext> = {}) {
   const app = await makeApp();
   const ctx: AppContext = { mode: "mock", ...app, verify: async () => true, ...over };
-  return { app, ctx, server: createServer(ctx) };
+  const raw = createServer(ctx);
+  return { app, ctx, server: withSession(raw, await startSession(raw)) };
 }
 
 const form = (data: Record<string, string>) => ({
@@ -117,7 +119,7 @@ describe("approval flow", () => {
   it("approve submits once even when the button is double-clicked", async () => {
     const { server, app } = await setup();
     await draftFor(server);
-    const body = form({ idempotency_key: "click-1" });
+    const body = form({ idempotency_key: "click-1", draft_id: "1", draft_version: "1" });
     const a = await server.request("/drafts/1/approve", body);
     const b = await server.request("/drafts/1/approve", body);
     expect(a.status).toBe(200);

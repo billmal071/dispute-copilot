@@ -33,6 +33,14 @@ export class AlreadyDecidedError extends Error {
   }
 }
 
+export class StaleDraftError extends Error {
+  readonly status = 409;
+  constructor(message: string) {
+    super(message);
+    this.name = "StaleDraftError";
+  }
+}
+
 export class ValidationError extends Error {
   readonly status = 422;
   constructor(message: string) {
@@ -259,6 +267,7 @@ export interface DecisionInput {
   draftId: number;
   idempotencyKey: string;
   decidedBy: string;
+  draftVersion: number;
   edited?: EvidenceDraft;
 }
 
@@ -289,6 +298,26 @@ export async function approveDraft(
     return execute(deps, action, disputeId);
   }
   if (db.prepare("SELECT 1 FROM approvals WHERE draft_id = ?").get(input.draftId))
+    throw new AlreadyDecidedError(input.draftId);
+  if (input.draftVersion !== draft.version)
+    throw new StaleDraftError(
+      `The preview showed draft v${input.draftVersion} but this is draft v${draft.version}. Reload and review again.`,
+    );
+  const newest = db
+    .prepare("SELECT MAX(version) AS v FROM drafts WHERE dispute_id = ?")
+    .get(disputeId) as { v: number };
+  if (newest.v !== draft.version)
+    throw new StaleDraftError(
+      `Draft v${draft.version} was superseded by v${newest.v}. Reload and review the latest draft.`,
+    );
+  if (
+    db
+      .prepare(
+        `SELECT 1 FROM approvals a JOIN drafts d ON d.id = a.draft_id
+         WHERE d.dispute_id = ? AND a.decision IN ('approve','edit')`,
+      )
+      .get(disputeId)
+  )
     throw new AlreadyDecidedError(input.draftId);
 
   const parsedEdit = input.edited ? EvidenceDraft.safeParse(input.edited) : null;
@@ -342,7 +371,7 @@ export async function approveDraft(
 
 export async function rejectDraft(
   deps: ApprovalDeps,
-  input: Omit<DecisionInput, "edited">,
+  input: Omit<DecisionInput, "edited" | "draftVersion">,
 ): Promise<{ approvalId: number }> {
   const { db, clock } = deps;
   const draft = loadDraftOrThrow(db, input.draftId);

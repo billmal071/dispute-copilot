@@ -61,11 +61,15 @@ export function scoreRing(score: number, size: "sm" | "lg" = "sm"): Safe {
   return h`<div class="score ${tone} ${size === "lg" ? "lg" : ""}" style="--pct:${score}" data-score="${score}" role="img" aria-label="Evidence quality score ${score} out of 100"><span>${score}</span></div>`;
 }
 
+const CSRF_MARKER = "__CSRF_TOKEN__";
+const csrfInput = raw(`<input type="hidden" name="csrf_token" value="${CSRF_MARKER}">`);
+
 export interface LayoutOptions {
   title: string;
   mode: "mock" | "sandbox";
   nav: "inbox" | "audit" | "";
   now: Date;
+  csrf: string;
 }
 
 export function layout(opts: LayoutOptions, body: Safe): string {
@@ -83,7 +87,7 @@ export function layout(opts: LayoutOptions, body: Safe): string {
 <script src="/assets/htmx.js" defer></script>
 <script>document.addEventListener("htmx:beforeSwap",function(e){var s=e.detail.xhr.status;if(s>=400&&s<600){e.detail.shouldSwap=true;e.detail.isError=false;}});</script>
 </head>
-<body hx-boost="false">
+<body hx-boost="false" hx-headers='{"X-CSRF-Token":"${opts.csrf}"}'>
 <a class="skip" href="#main">Skip to content</a>
 <header class="topbar"><div class="topbar-inner">
   <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5L16 9.5"/></svg></span>Dispute Copilot</a>
@@ -95,7 +99,9 @@ export function layout(opts: LayoutOptions, body: Safe): string {
 </div></header>
 <main id="main">${body}</main>
 </body>
-</html>`.toString();
+</html>`
+    .toString()
+    .replaceAll(CSRF_MARKER, opts.csrf);
 }
 
 export interface InboxRow {
@@ -108,11 +114,11 @@ export function inboxPage(rows: InboxRow[], now: Date, mode: "mock" | "sandbox")
   const waiting = rows.filter((r) => r.dispute.status === "WAITING_FOR_SELLER_RESPONSE").length;
   const head = h`<div class="page-head">
     <div><h1>Disputes</h1><p>${rows.length} synced, ${waiting} waiting for your response.</p></div>
-    <form method="post" action="/sync"><button class="btn" type="submit">Sync now</button></form>
+    <form method="post" action="/sync">${csrfInput}<button class="btn" type="submit">Sync now</button></form>
   </div>`;
   if (rows.length === 0) {
     return h`${head}<div class="card empty"><h2>No disputes yet</h2><p>Sync with ${mode === "mock" ? "the seeded mock data" : "PayPal"} to load your open disputes.</p>
-      <form method="post" action="/sync"><button class="btn primary" type="submit">Sync now</button></form></div>`;
+      <form method="post" action="/sync">${csrfInput}<button class="btn primary" type="submit">Sync now</button></form></div>`;
   }
   const sorted = [...rows].sort((a, b) =>
     (a.dispute.seller_response_due_date ?? "9").localeCompare(
@@ -259,6 +265,8 @@ export function decisionPanel(
           : h`<div class="callout error"><strong>PayPal did not accept the submission.</strong> ${errorText ?? ""} The draft is saved. Retrying reuses the same PayPal-Request-Id, so it cannot be applied twice.</div>
              <form style="margin-top:12px" hx-post="/drafts/${draft.id}/approve" hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="find button">
                <input type="hidden" name="idempotency_key" value="${a?.request_id ?? ""}">
+               <input type="hidden" name="draft_id" value="${draft.id}">
+               <input type="hidden" name="draft_version" value="${draft.version}">
                <button class="btn primary" type="submit">Retry submission</button></form>`
     }
     <p class="hint" style="margin-top:12px"><a href="/audit?dispute=${draft.dispute_id}">View audit trail for ${draft.dispute_id}</a></p>
@@ -392,6 +400,8 @@ export function previewDialog(
     ${opts.edits.length > 0 ? h`<div class="callout info">You edited: ${opts.edits.join(", ")}. The recorded decision will be "edit" and both versions are kept.</div>` : h`<div class="callout ok">Unedited agent draft.</div>`}
     <pre class="payload">${JSON.stringify(payload.request, null, 2)}</pre>
     <input type="hidden" name="idempotency_key" value="${opts.idempotencyKey}">
+    <input type="hidden" name="draft_id" value="${draft.id}">
+    <input type="hidden" name="draft_version" value="${draft.version}">
     ${Object.entries(opts.fields).map(([k, v]) => h`<input type="hidden" name="${k}" value="${v}">`)}
   </div>
   <div class="dlg-foot">

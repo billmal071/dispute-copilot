@@ -22,7 +22,7 @@ async function drafted(disputeId: string) {
   return { app, draft: result.draft };
 }
 
-const decider = { decidedBy: "merchant@example.com" };
+const decider = { decidedBy: "merchant@example.com", draftVersion: 1 };
 const row = <T>(v: unknown) => v as T;
 
 describe("approval gate", () => {

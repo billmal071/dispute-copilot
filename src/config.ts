@@ -5,6 +5,7 @@ const optionalString = z.preprocess(blankToUndefined, z.string().optional());
 
 const EnvSchema = z.object({
   MODE: z.preprocess(blankToUndefined, z.enum(["mock", "sandbox"]).default("mock")),
+  HOST: z.preprocess(blankToUndefined, z.string().default("127.0.0.1")),
   PORT: z.preprocess(blankToUndefined, z.coerce.number().int().positive().default(3000)),
   PAYPAL_CLIENT_ID: optionalString,
   PAYPAL_CLIENT_SECRET: optionalString,
@@ -17,6 +18,7 @@ const EnvSchema = z.object({
 
 export interface Config {
   mode: "mock" | "sandbox";
+  host: string;
   port: number;
   dbPath: string;
   anthropicApiKey: string | undefined;
@@ -38,6 +40,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   }
   return {
     mode: parsed.MODE,
+    host: parsed.HOST,
     port: parsed.PORT,
     dbPath: parsed.DB_PATH ?? "data/app.db",
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,

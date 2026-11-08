@@ -1,13 +1,15 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import {
   AlreadyDecidedError,
   ApprovalRequiredError,
   approveDraft,
   buildPayload,
   rejectDraft,
+  StaleDraftError,
   submitApproved,
   ValidationError,
 } from "./actions/approve.js";
@@ -37,6 +39,7 @@ import { handleWebhook } from "./webhook.js";
 
 const ROOT = join(import.meta.dirname, "..");
 const DECIDER = "merchant@local";
+const CSRF_FIELD = "csrf_token";
 
 const readAsset = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
@@ -111,10 +114,71 @@ function passthroughFields(form: Record<string, unknown>): Record<string, string
   );
 }
 
-export function createServer(ctx: AppContext): Hono {
-  const app = new Hono();
-  const page = (title: string, nav: "inbox" | "audit" | "", body: ReturnType<typeof h>) =>
-    layout({ title, mode: ctx.mode, nav, now: ctx.clock.now() }, body);
+const CSRF_COOKIE = "dc_csrf";
+const CSRF_EXEMPT = new Set(["/webhooks/paypal"]);
+
+function csrfGuard(secret: Buffer) {
+  const sign = (id: string) => createHmac("sha256", secret).update(id).digest("base64url");
+  const valid = (token: string | undefined): token is string => {
+    const [id, mac] = token?.split(".") ?? [];
+    if (!id || !mac) return false;
+    const expected = Buffer.from(sign(id));
+    const actual = Buffer.from(mac);
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  };
+  const mint = () => {
+    const id = randomBytes(18).toString("base64url");
+    return `${id}.${sign(id)}`;
+  };
+  return { valid, mint };
+}
+
+export type Server = Hono<{ Variables: { csrf: string } }>;
+
+export function createServer(ctx: AppContext): Server {
+  const app: Server = new Hono();
+  const csrf = csrfGuard(randomBytes(32));
+  const page = (
+    c: { get(key: "csrf"): string },
+    title: string,
+    nav: "inbox" | "audit" | "",
+    body: ReturnType<typeof h>,
+  ) => layout({ title, mode: ctx.mode, nav, now: ctx.clock.now(), csrf: c.get("csrf") }, body);
+
+  app.use("*", async (c, next) => {
+    const existing = getCookie(c, CSRF_COOKIE);
+    const token = csrf.valid(existing) ? existing : csrf.mint();
+    c.set("csrf", token);
+    if (token !== existing)
+      setCookie(c, CSRF_COOKIE, token, { httpOnly: true, sameSite: "Strict", path: "/" });
+    const method = c.req.method;
+    if (method === "GET" || method === "HEAD" || CSRF_EXEMPT.has(c.req.path)) return next();
+
+    const reject = (why: string) => c.json({ error: `Request blocked: ${why}` }, 403);
+    const site = c.req.header("sec-fetch-site");
+    if (site && site !== "same-origin" && site !== "none") return reject("cross-site request");
+    const origin = c.req.header("origin");
+    if (origin !== undefined) {
+      let originHost: string | null = null;
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        originHost = null;
+      }
+      if (originHost !== new URL(c.req.url).host) return reject("cross-origin request");
+    }
+    if (existing !== token) return reject("missing session");
+    let submitted = c.req.header("x-csrf-token");
+    if (!submitted) {
+      const type = c.req.header("content-type") ?? "";
+      if (type.includes("form")) {
+        const field = (await c.req.parseBody())[CSRF_FIELD];
+        submitted = typeof field === "string" ? field : undefined;
+      }
+    }
+    if (submitted !== token) return reject("missing or invalid CSRF token");
+    return next();
+  });
   const isHtmx = (c: { req: { header(name: string): string | undefined } }) =>
     c.req.header("hx-request") === "true";
 
@@ -148,7 +212,7 @@ export function createServer(ctx: AppContext): Hono {
         decision: decision?.decision ?? null,
       };
     });
-    return c.html(page("Disputes", "inbox", inboxPage(rows, ctx.clock.now(), ctx.mode)));
+    return c.html(page(c, "Disputes", "inbox", inboxPage(rows, ctx.clock.now(), ctx.mode)));
   });
 
   app.post("/sync", async (c) => {
@@ -158,6 +222,7 @@ export function createServer(ctx: AppContext): Hono {
       const message = err instanceof PayPalError ? err.message : String(err);
       return c.html(
         page(
+          c,
           "Sync failed",
           "inbox",
           h`<div class="card empty"><h2>PayPal unavailable</h2><div class="callout error" style="text-align:left">${message}</div><p class="hint" style="margin-top:8px">Showing the last synced data. Your drafts are saved.</p><a class="btn primary" href="/">Back to inbox</a></div>`,
@@ -178,6 +243,7 @@ export function createServer(ctx: AppContext): Hono {
       if (err instanceof PayPalError && err.status === 404) {
         return c.html(
           page(
+            c,
             "Not found",
             "inbox",
             notFoundPage("Dispute not found", `PayPal has no dispute with id ${id}.`),
@@ -191,6 +257,7 @@ export function createServer(ctx: AppContext): Hono {
     if (!dispute) {
       return c.html(
         page(
+          c,
           "Unavailable",
           "inbox",
           notFoundPage("PayPal unavailable", loadError ?? "The dispute could not be loaded."),
@@ -223,7 +290,7 @@ export function createServer(ctx: AppContext): Hono {
       ? h`<div class="callout warn">PayPal is unavailable (${loadError}). Showing the last synced copy of this dispute.</div>`
       : "";
     return c.html(
-      page(dispute.dispute_id, "inbox", h`${banner}${detailPage(view, panel, ctx.clock.now())}`),
+      page(c, dispute.dispute_id, "inbox", h`${banner}${detailPage(view, panel, ctx.clock.now())}`),
     );
   });
 
@@ -232,6 +299,7 @@ export function createServer(ctx: AppContext): Hono {
     if (!localDispute(ctx, id)) {
       return c.html(
         page(
+          c,
           "Not found",
           "inbox",
           notFoundPage("Dispute not found", `No synced dispute with id ${id}.`),
@@ -283,11 +351,20 @@ export function createServer(ctx: AppContext): Hono {
         ? form.idempotency_key
         : `draft-${draftId}`;
     const { edited } = applyEdits(stored.draft, form);
+    const draftVersion = Number(form.draft_version);
+    if (!Number.isInteger(draftVersion) || Number(form.draft_id) !== draftId)
+      return c.html(
+        errorFragment(
+          "This approval did not say which draft version you reviewed. Reload the page.",
+        ).toString(),
+        409,
+      );
     try {
       const outcome = await approveDraft(approvalDeps(), {
         draftId,
         idempotencyKey: key,
         decidedBy: DECIDER,
+        draftVersion,
         edited,
       });
       if (!isHtmx(c)) return c.redirect(`/disputes/${stored.dispute_id}`, 303);
@@ -300,6 +377,7 @@ export function createServer(ctx: AppContext): Hono {
         c.header("HX-Reswap", "innerHTML");
         return c.html(errorFragment(err.message).toString(), 422);
       }
+      if (err instanceof StaleDraftError) return c.html(errorFragment(err.message).toString(), 409);
       if (err instanceof AlreadyDecidedError) {
         const decision = loadDecision(ctx, draftId);
         return c.html(
@@ -348,6 +426,7 @@ export function createServer(ctx: AppContext): Hono {
     const dispute = c.req.query("dispute") || undefined;
     return c.html(
       page(
+        c,
         "Audit trail",
         "audit",
         auditPage(listAudit(ctx.db, dispute).reverse(), verifyChain(ctx.db), dispute),
@@ -380,12 +459,16 @@ export function createServer(ctx: AppContext): Hono {
   });
 
   app.notFound((c) =>
-    c.html(page("Not found", "", notFoundPage("Page not found", "That page does not exist.")), 404),
+    c.html(
+      page(c, "Not found", "", notFoundPage("Page not found", "That page does not exist.")),
+      404,
+    ),
   );
   app.onError((err, c) => {
     console.error(err);
     return c.html(
       page(
+        c,
         "Error",
         "",
         notFoundPage(
