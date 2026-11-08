@@ -17,6 +17,10 @@ npm start
 
 Requires Node 24. With `MODE=mock` (default) everything runs offline on 13 seeded disputes. Without `ANTHROPIC_API_KEY` the agent uses a scripted demo fixture from `fixtures/llm-cache`, not real Claude output; the UI labels these drafts "Scripted demo fixture". Mock mode uses a fixed demo clock (`DEMO_NOW`) so replayed inputs stay identical.
 
+## Interface
+
+Server-rendered Hono plus htmx, fonts (Instrument Serif, Geist, Geist Mono; SIL OFL) and icons self-hosted, no CDN. The inbox ranks disputes by urgency times expected value (amount times evidence score for contests; an estimate, not a PayPal prediction). The dispute page shows the case file, a win-chance gauge with its score breakdown, an evidence ledger flagging what is missing and what to collect, and an approval sheet with the exact outbound request. In mock mode with no model key, startup pre-drafts most seeded disputes from the scripted fixtures so the demo opens populated; two are left undrafted to show the draft flow. `npx tsx scripts/build-icons.ts` regenerates the favicon set.
+
 ## Demo fixtures vs live model
 
 The files in `fixtures/llm-cache` are scripted demo fixtures written by `scripts/build-llm-cache.ts`. A fake LLM that follows a fixed tool plan and returns hand-written drafts produced them (`source: "scripted-fixture"`), and no Claude model was called. They exist so the app, the approval flow and the score run offline with no credentials. Their drafts and the replay eval numbers say nothing about model quality. With `ANTHROPIC_API_KEY` set, the same agent loop calls `claude-sonnet-5-5`, the UI shows the live model name, and responses are recorded into the cache as `source: "anthropic"`.
