@@ -1,0 +1,19 @@
+{
+  "key": "611587aa4cdaa4169a327dec3ddc715c0c5c7f92e44626b14902b8a756e9efd1",
+  "source": "nvidia:mistralai/mistral-large-4-1t-a52b",
+  "recorded_at": "2026-11-10T16:01:49.340Z",
+  "response": {
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "ed7ace38c",
+        "name": "get_order",
+        "input": {
+          "order_id": "LL-1012"
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "model": "mistralai/mistral-large-4-1t-a52b"
+  }
+}

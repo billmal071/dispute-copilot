@@ -1,0 +1,41 @@
+{
+  "key": "587505b86432c8327317e69967e4d1d694bedefb5706d005c9dba32825ed9d06",
+  "source": "nvidia:mistralai/mistral-large-4-1t-a52b",
+  "recorded_at": "2026-11-10T14:51:51.302Z",
+  "response": {
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "eaee528d4",
+        "name": "get_transaction",
+        "input": {
+          "transaction_id": "5TX10020042"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "272bef4cd",
+        "name": "get_tracking",
+        "input": {
+          "transaction_id": "5TX10020042"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "7f7fba68e",
+        "name": "list_prior_disputes_for_buyer",
+        "input": {
+          "buyer_id": "PB-1002"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "d8d8c79a7",
+        "name": "get_merchant_policies",
+        "input": {}
+      }
+    ],
+    "stop_reason": "tool_use",
+    "model": "mistralai/mistral-large-4-1t-a52b"
+  }
+}

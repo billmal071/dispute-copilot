@@ -1,0 +1,19 @@
+{
+  "key": "9ce46d257018b5e1840ae04573009b860026bafffd2491e32b495d91006c4b59",
+  "source": "nvidia:nvidia/nemotron-3.5-lightning-30b-a3b",
+  "recorded_at": "2026-11-10T16:13:22.107Z",
+  "response": {
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "call-3166ffe9-ed49-42f8-bf54-936f3fad5bb6",
+        "name": "get_transaction",
+        "input": {
+          "transaction_id": "5TX10050042"
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b"
+  }
+}
