@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { MerchantData } from "../merchant/data.js";
 import { PayPalError, type ReadOnlyPayPalClient } from "../paypal/client.js";
+import { withDisputeBuyer } from "../paypal/mappers.js";
 import { type Dispute, EvidenceDraft, type ToolRun, type Transaction } from "../types.js";
 import type { LLMTool } from "./llm.js";
 
@@ -120,7 +121,10 @@ export async function executeReadTool(
         return { name, input, ref, output: { ref, ...wrapBuyerFields(d) }, is_error: false };
       }
       case "get_transaction": {
-        const t = await reader.getTransaction(id("transaction_id"));
+        const fetched = await reader.getTransaction(id("transaction_id"));
+        const t = fetched.buyer.id
+          ? fetched
+          : withDisputeBuyer(fetched, await reader.getDispute(currentDisputeId));
         const ref = `transaction:${t.id}`;
         return { name, input, ref, output: { ref, ...wrapTransactionBuyer(t) }, is_error: false };
       }

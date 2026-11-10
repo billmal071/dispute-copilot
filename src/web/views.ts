@@ -283,7 +283,7 @@ const hasError = <T extends object>(v: T | { error: string } | null): v is { err
 function addressLine(
   a: { line1: string; city: string; postal_code: string; country_code: string } | null,
 ) {
-  return a ? `${a.line1}, ${a.city} ${a.postal_code}, ${a.country_code}` : "Not on file";
+  return a ? `${a.line1}, ${a.city} ${a.postal_code}, ${a.country_code}` : "Not available";
 }
 
 const hl = (on: boolean, content: unknown): Safe =>
@@ -314,9 +314,9 @@ function caseFile(ev: EvidenceView, now: Date): Safe {
     txn
       ? h`<dl class="kv">
     <dt>Transaction</dt><dd class="mono">${txn.id}</dd>
-    <dt>Order</dt><dd class="mono">${txn.order_id}</dd>
+    <dt>Order</dt><dd class="mono">${txn.order_id || "Not available"}</dd>
     <dt>Paid</dt><dd class="tnum">${money(txn.amount)} on ${dateFmt(txn.created)}</dd>
-    <dt>Buyer</dt><dd>${txn.buyer.name}<div class="sub">${txn.buyer.email}</div></dd>
+    <dt>Buyer</dt><dd>${txn.buyer.name || "Not available"}<div class="sub">${txn.buyer.email}</div></dd>
     <dt>Ship to</dt><dd>${hl(facts.has("address"), addressLine(txn.shipping_address))}</dd>
     <dt>Refunds</dt><dd>${txn.refunds.length === 0 ? "None" : txn.refunds.map((r) => h`<div>${hl(facts.has("refunds"), h`<span class="tnum">${money(r.amount)}</span> <span class="mono">${r.id}</span>`)} on ${dateFmt(r.created)}</div>`)}</dd>
   </dl>`

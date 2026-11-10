@@ -96,3 +96,18 @@ export function mapTracking(transactionId: string, raw: Raw): Tracking {
     delivery_address: null,
   };
 }
+
+export function withDisputeBuyer(txn: Transaction, dispute: Dispute): Transaction {
+  const fallback = dispute.disputed_transactions.find(
+    (t) => t.seller_transaction_id === txn.id,
+  )?.buyer;
+  if (!fallback) return txn;
+  return {
+    ...txn,
+    buyer: {
+      id: txn.buyer.id || fallback.id,
+      name: txn.buyer.name || fallback.name,
+      email: txn.buyer.email,
+    },
+  };
+}

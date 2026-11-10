@@ -17,6 +17,7 @@ import { createDraft, getDraft, latestDraft } from "./agent/draft.js";
 import type { AppContext } from "./app.js";
 import { listAudit, verifyChain } from "./audit.js";
 import { PayPalError } from "./paypal/client.js";
+import { withDisputeBuyer } from "./paypal/mappers.js";
 import { syncDisputes } from "./sync.js";
 import type { Dispute, EvidenceDraft } from "./types.js";
 import { h } from "./web/html.js";
@@ -324,9 +325,13 @@ export function createServer(ctx: AppContext): Server {
         return { error: err instanceof Error ? err.message : String(err) };
       }
     };
-    const transaction = await settle(() => ctx.reader.getTransaction(txnId));
+    const transaction = await settle(async () =>
+      withDisputeBuyer(await ctx.reader.getTransaction(txnId), dispute),
+    );
     const order =
-      "error" in transaction ? null : await settle(() => ctx.reader.getOrder(transaction.order_id));
+      "error" in transaction || !transaction.order_id
+        ? null
+        : await settle(() => ctx.reader.getOrder(transaction.order_id));
     const tracking = await settle(() => ctx.reader.getTracking(txnId));
     const view: EvidenceView = { dispute, transaction, order, tracking };
 
