@@ -29,6 +29,7 @@ A small merchant opens the inbox of PayPal disputes, ranked by urgency times exp
 Customer Disputes API (merchant side), Payments captures, and Shipping trackers, in both a mock client and a sandbox client behind one interface.
 
 Verified against the real PayPal sandbox on 2026-11-10 (from `docs/unverified.md`):
+
 - Token scopes: the client-credentials token carried `read-seller` and `disputes/update-seller`.
 - `GET /v1/customer/disputes/{id}` and `GET /v2/payments/captures/{id}` on a real dispute (PP-R-BVH-10197979); the capture had no linked order, so the transaction is assembled without an order call.
 - `GET /v1/shipping/trackers?transaction_id=` returned no tracker (treated as "no tracking on file").
@@ -37,6 +38,7 @@ Verified against the real PayPal sandbox on 2026-11-10 (from `docs/unverified.md
 - End-to-end read path (inbox, case view, draft, audit verify) worked on the real dispute.
 
 Not verified (do not claim as working against PayPal):
+
 - Provide-evidence with file uploads (a multipart attempt was rejected with 400; cause unknown).
 - accept-claim, make-offer, send-message, sandbox require-evidence and adjudicate writes. They run in mock mode only.
 - Webhook signature verification via `/v1/notifications/verify-webhook-signature`.
@@ -69,13 +71,13 @@ Not verified (do not claim as working against PayPal):
 
 Criteria as listed by third-party sources: technical implementation, design, potential impact, innovation, presentation. Confirm against the official rules.
 
-| Criterion | Evidence |
-| --- | --- |
+| Criterion                | Evidence                                                                                                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Technical implementation | Compile-time read/write split, CSRF plus draft-version-bound approval, atomic in-flight claim, hash-chained anchored audit, 197 tests, real sandbox read and one write |
-| Design | Four-view flow (inbox, case file, evidence ledger, approval sheet showing the exact outbound request), self-hosted fonts and icons, explicit fixture labels |
-| Potential impact | Disputes are a real merchant chore; the approval gate keeps the merchant in control. No quantified impact claimed |
-| Innovation | Grounded-citation rule, deterministic evidence score, prompt-injection handling for buyer messages, tamper-evident audit |
-| Presentation | 2:40 video, README, `docs/unverified.md` listing exactly what is and is not verified |
+| Design                   | Four-view flow (inbox, case file, evidence ledger, approval sheet showing the exact outbound request), self-hosted fonts and icons, explicit fixture labels            |
+| Potential impact         | Disputes are a real merchant chore; the approval gate keeps the merchant in control. No quantified impact claimed                                                      |
+| Innovation               | Grounded-citation rule, deterministic evidence score, prompt-injection handling for buyer messages, tamper-evident audit                                               |
+| Presentation             | 2:40 video, README, `docs/unverified.md` listing exactly what is and is not verified                                                                                   |
 
 ## Built with
 
