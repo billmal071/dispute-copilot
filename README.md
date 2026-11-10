@@ -64,4 +64,10 @@ Deterministic, 0-100, no LLM: required evidence types, delivery verified in fetc
 - No authentication; single merchant user.
 - Sandbox response mappings are untested against real PayPal.
 
+## Docs
+
+- `docs/SUBMISSION.md`: hackathon submission text and judging mapping.
+- `docs/DEMO_SCRIPT.md`: demo video script and pre-recording checklist.
+- `docs/unverified.md`: what is and is not verified against the PayPal sandbox.
+
 MIT licensed.
