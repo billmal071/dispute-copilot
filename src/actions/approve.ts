@@ -57,6 +57,13 @@ export type Payload =
   | { kind: "make-offer"; request: MakeOfferRequest };
 
 const MAX_NOTES = 2000;
+const CARRIER_CODE = /^[0-9A-Z_]+$/;
+
+function trackingInfo(t: { carrier: string; number: string }) {
+  return CARRIER_CODE.test(t.carrier)
+    ? { carrier_name: t.carrier, tracking_number: t.number }
+    : { carrier_name: "OTHER", carrier_name_other: t.carrier, tracking_number: t.number };
+}
 
 export function buildPayload(dispute: Dispute, draft: EvidenceDraft): Payload {
   const note = (draft.merchant_message ?? "").trim().slice(0, MAX_NOTES);
@@ -86,12 +93,7 @@ export function buildPayload(dispute: Dispute, draft: EvidenceDraft): Payload {
                   evidence_info: {
                     ...(e.tracking
                       ? {
-                          tracking_info: [
-                            {
-                              carrier_name: e.tracking.carrier,
-                              tracking_number: e.tracking.number,
-                            },
-                          ],
+                          tracking_info: [trackingInfo(e.tracking)],
                         }
                       : {}),
                     ...(e.refund_ids?.length ? { refund_ids: e.refund_ids } : {}),

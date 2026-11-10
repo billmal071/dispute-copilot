@@ -162,7 +162,7 @@ export class SandboxPayPal implements PayPalClient {
     const body = (await res.json().catch(() => ({}))) as {
       name?: string;
       message?: string;
-      details?: { issue?: string }[];
+      details?: { field?: string; issue?: string; description?: string }[];
     };
     if (res.status === 403) {
       return new PayPalError(
@@ -171,10 +171,15 @@ export class SandboxPayPal implements PayPalClient {
         `PayPal refused the request. The app token needs the scope ${scope} and the Customer disputes add-on enabled.`,
       );
     }
+    const detail = (body.details ?? [])
+      .map((d) => [d.field, d.issue, d.description].filter(Boolean).join(" "))
+      .filter((d) => d.length > 0)
+      .join("; ");
+    const message = body.message ?? `PayPal returned HTTP ${res.status}`;
     return new PayPalError(
       res.status,
       body.name ?? "PAYPAL_ERROR",
-      body.message ?? `PayPal returned HTTP ${res.status}`,
+      detail ? `${message} (${detail})` : message,
       body.details?.[0]?.issue,
     );
   }
@@ -240,6 +245,10 @@ export class SandboxPayPal implements PayPalClient {
     req: ProvideEvidenceRequest,
     requestId: string,
   ): Promise<ActionResponse> {
+    const path = `/v1/customer/disputes/${encodeURIComponent(id)}/provide-evidence`;
+    if (!req.files?.length) {
+      return this.post(path, id, { json: { evidences: req.evidences }, requestId });
+    }
     const form = new FormData();
     form.set(
       "input",
@@ -253,10 +262,7 @@ export class SandboxPayPal implements PayPalClient {
         file.name,
       );
     }
-    return this.post(`/v1/customer/disputes/${encodeURIComponent(id)}/provide-evidence`, id, {
-      form,
-      requestId,
-    });
+    return this.post(path, id, { form, requestId });
   }
 
   acceptClaim(id: string, req: AcceptClaimRequest, requestId: string): Promise<ActionResponse> {

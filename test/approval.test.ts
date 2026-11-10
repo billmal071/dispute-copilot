@@ -209,6 +209,39 @@ describe("approval gate", () => {
   });
 });
 
+describe("tracking carrier names", () => {
+  const trackingOf = (carrier: string) => {
+    const payload = buildPayload(
+      dispute(),
+      draft({
+        recommendation: "CONTEST",
+        evidences: [
+          {
+            evidence_type: "PROOF_OF_FULFILLMENT",
+            notes: "shipped",
+            tracking: { carrier, number: "T1" },
+            source_refs: [],
+          },
+        ],
+      }),
+    );
+    if (payload.kind !== "provide-evidence") throw new Error("expected provide-evidence");
+    return payload.request.evidences[0]?.evidence_info?.tracking_info?.[0];
+  };
+
+  it("passes a PayPal carrier code through", () => {
+    expect(trackingOf("DHL")).toEqual({ carrier_name: "DHL", tracking_number: "T1" });
+  });
+
+  it("sends a free-text carrier as OTHER with carrier_name_other", () => {
+    expect(trackingOf("Local Courier Ltd")).toEqual({
+      carrier_name: "OTHER",
+      carrier_name_other: "Local Courier Ltd",
+      tracking_number: "T1",
+    });
+  });
+});
+
 describe("note sent to PayPal for ACCEPT and OFFER", () => {
   const d = dispute();
   const secret = "INTERNAL: contesting will fail, buyer is probably right";

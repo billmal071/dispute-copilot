@@ -98,6 +98,45 @@ describe("SandboxPayPal", () => {
     expect(body.get("evidence-file")).toBeInstanceOf(Blob);
   });
 
+  it("carries PayPal's validation details in the error message", async () => {
+    const { client } = harness(() =>
+      Response.json(
+        {
+          name: "INVALID_REQUEST",
+          message: "Request is not well-formed.",
+          details: [
+            {
+              field: "/evidences/0/evidence_type",
+              issue: "INVALID_STRING_LENGTH",
+              description: "too long",
+            },
+          ],
+        },
+        { status: 400 },
+      ),
+    );
+    const err = await client
+      .acceptClaim("PP-D-9", { note: "n", accept_claim_reason: "NOT_ABLE_TO_WIN" }, "k")
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(PayPalError);
+    expect((err as PayPalError).message).toContain("/evidences/0/evidence_type");
+    expect((err as PayPalError).message).toContain("INVALID_STRING_LENGTH");
+  });
+
+  it("posts evidence without files as a JSON body", async () => {
+    const { client, calls } = harness(() => Response.json({ links: [] }));
+    await client.provideEvidence(
+      "PP-D-9",
+      { evidences: [{ evidence_type: "OTHER", notes: "n" }] },
+      "k",
+    );
+    const write = calls.find((c) => c.url.endsWith("/provide-evidence"));
+    expect(new Headers(write?.init.headers).get("content-type")).toBe("application/json");
+    expect(JSON.parse(String(write?.init.body))).toEqual({
+      evidences: [{ evidence_type: "OTHER", notes: "n" }],
+    });
+  });
+
   it("retries 503 with exponential backoff and then succeeds", async () => {
     let attempts = 0;
     const { client, sleeps } = harness(() => {

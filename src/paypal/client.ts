@@ -33,7 +33,11 @@ export interface EvidencePayload {
   evidence_type: EvidenceType;
   notes: string;
   evidence_info?: {
-    tracking_info?: { carrier_name: string; tracking_number: string }[];
+    tracking_info?: {
+      carrier_name: string;
+      carrier_name_other?: string;
+      tracking_number: string;
+    }[];
     refund_ids?: string[];
   };
 }
