@@ -133,6 +133,25 @@ describe("dispute page", () => {
     expect(html).toContain("not real Claude output");
   });
 
+  it("shows no numeric evidence score when the agent is not contesting", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/disputes/PP-D-1002")).text();
+    expect(html).toContain("ACCEPT");
+    expect(html).toContain("Evidence score: n/a, not contesting");
+    expect(html).not.toMatch(/data-score="/);
+    expect(html).not.toContain("/ 100");
+    expect(html).toContain('data-part="grounded_citations"');
+    expect(html).toContain("Confidence ");
+  });
+
+  it("keeps the evidence score for a contest", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/disputes/PP-D-1001")).text();
+    expect(html).toContain("Evidence score");
+    expect(html).toContain("/ 100");
+    expect(html).not.toContain("n/a, not contesting");
+  });
+
   it("flags missing evidence and says what to collect", async () => {
     const { server } = await setup(true);
     const html = await (await server.request("/disputes/PP-D-1013")).text();

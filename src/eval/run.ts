@@ -69,10 +69,10 @@ export function renderResults(s: EvalSummary): string {
   const rows = s.cases
     .map(
       (c) =>
-        `| ${c.slug} | ${c.expected} | ${c.actual ?? "failed"} | ${c.score ?? "-"} | ${c.ungrounded} |`,
+        `| ${c.slug} | ${c.expected} | ${c.actual ?? "failed"} | ${c.score ?? (c.actual ? "n/a" : "-")} | ${c.ungrounded} |`,
     )
     .join("\n");
-  return `# Eval results\n\n${note}\n\n- Recommendation accuracy: ${(s.accuracy * 100).toFixed(0)}%\n- Mean evidence-quality score: ${s.meanScore.toFixed(1)}\n- Ungrounded claims: ${s.ungroundedClaims}\n\n| Scenario | Expected | Agent | Score | Ungrounded |\n|---|---|---|---|---|\n${rows}\n`;
+  return `# Eval results\n\n${note}\n\n- Recommendation accuracy: ${(s.accuracy * 100).toFixed(0)}%\n- Mean evidence-quality score (contests only): ${s.meanScore.toFixed(1)}\n- Ungrounded claims: ${s.ungroundedClaims}\n\n| Scenario | Expected | Agent | Score | Ungrounded |\n|---|---|---|---|---|\n${rows}\n`;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

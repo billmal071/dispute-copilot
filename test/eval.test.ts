@@ -10,6 +10,17 @@ describe("eval harness", () => {
     expect(summary.meanScore).toBeGreaterThan(80);
   });
 
+  it("leaves non-contest cases unscored and out of the mean", async () => {
+    const summary = await runEval();
+    const noContest = summary.cases.filter((c) => c.actual !== "CONTEST");
+    expect(noContest.length).toBeGreaterThan(0);
+    expect(noContest.every((c) => c.score === null)).toBe(true);
+    const contests = summary.cases.filter((c) => c.score !== null);
+    const mean = contests.reduce((s, c) => s + (c.score ?? 0), 0) / contests.length;
+    expect(summary.meanScore).toBeCloseTo(mean);
+    expect(renderResults(summary)).toContain("| n/a |");
+  });
+
   it("labels replayed results as a cache integrity check, not model performance", async () => {
     const md = renderResults(await runEval());
     expect(md).toContain("scripted fixtures");

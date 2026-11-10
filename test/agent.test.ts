@@ -249,4 +249,25 @@ describe("runAgent", () => {
     });
     expect(events).toEqual(["tool_call", "draft_submitted"]);
   });
+
+  it("audits a null score for a draft that is not contesting", async () => {
+    const { reader, merchant } = setup();
+    const payloads: unknown[] = [];
+    const { llm } = stubLLM([
+      turn(
+        toolUse("t1", "submit_recommendation", draft({ recommendation: "ACCEPT", evidences: [] })),
+      ),
+    ]);
+    await runAgent({
+      disputeId: "PP-D-1001",
+      reader,
+      merchant,
+      llm,
+      now: NOW,
+      onEvent: (e, payload) => {
+        if (e === "draft_submitted") payloads.push(payload);
+      },
+    });
+    expect(payloads).toEqual([{ recommendation: "ACCEPT", score: null }]);
+  });
 });

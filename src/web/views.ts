@@ -104,7 +104,7 @@ export function gauge(score: number, contest: boolean): Safe {
     const [x2, y2] = [100 + (GAUGE_R + 11) * Math.cos(a), 100 + (GAUGE_R + 11) * Math.sin(a)];
     return h`<line class="g-tick" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
   };
-  return h`<div class="gauge ${contest ? tone : "none"}" data-score="${score}" ${contest ? raw(`data-gauge="${score}"`) : ""} role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${contest ? `Estimated win chance ${score} percent` : "Win chance not applicable: the agent does not recommend contesting"}" style="--arc:${GAUGE_ARC.toFixed(2)};--fill:${fill.toFixed(2)}">
+  return h`<div class="gauge ${contest ? tone : "none"}" ${contest ? raw(`data-score="${score}" data-gauge="${score}"`) : ""} role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${contest ? `Estimated win chance ${score} percent` : "Win chance not applicable: the agent does not recommend contesting"}" style="--arc:${GAUGE_ARC.toFixed(2)};--fill:${fill.toFixed(2)}">
   <svg viewBox="0 0 200 200" aria-hidden="true">
     <circle class="g-track" cx="100" cy="100" r="${GAUGE_R}" stroke-dasharray="${GAUGE_ARC.toFixed(2)} ${GAUGE_C.toFixed(2)}" transform="rotate(135 100 100)"/>
     ${contest ? h`<circle class="g-fill" cx="100" cy="100" r="${GAUGE_R}" stroke-dasharray="${fill.toFixed(2)} ${GAUGE_C.toFixed(2)}" transform="rotate(135 100 100)"/>` : ""}
@@ -477,7 +477,7 @@ export function draftPanel(
       : ""
   }
   <section class="block" aria-labelledby="bd-h">
-    <div class="block-head"><h3 id="bd-h">How the score is built</h3><span class="tally"><b class="tnum">${draft.score}</b> / 100</span></div>
+    <div class="block-head"><h3 id="bd-h">How the score is built</h3>${contest ? h`<span class="tally">Evidence score <b class="tnum">${draft.score}</b> / 100</span>` : h`<span class="tally">Evidence score: n/a, not contesting</span>`}</div>
     <ul class="parts">
     ${s.breakdown.map((p) => h`<li class="part ${p.applicable ? "" : "na"}" data-part="${p.key}"><div class="part-head"><span>${p.label}</span><span class="pts tnum">${p.applicable ? h`${p.points}<i>/${p.max}</i>` : "n/a"}</span></div><span class="bar" role="img" aria-label="${p.applicable ? `${p.points} of ${p.max} points` : "Not applicable"}"><i style="--w:${p.applicable ? Math.round((p.points / p.max) * 100) : 0}%"></i></span><span class="why">${p.reason}</span></li>`)}
     ${s.penalties.map((p) => h`<li class="part pen" data-part="${p.key}"><div class="part-head"><span>Penalty: ${p.key.replace(/_/g, " ")}</span><span class="pts tnum">${p.points}</span></div><span class="why">${p.reason}</span></li>`)}

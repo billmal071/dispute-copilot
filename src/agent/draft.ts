@@ -109,7 +109,7 @@ export async function createDraft(deps: DraftDeps, disputeId: string): Promise<D
       disputeId,
       last.v + 1,
       JSON.stringify(result.draft),
-      result.score.total,
+      result.score.total ?? 0,
       JSON.stringify(result.score),
       JSON.stringify(result.toolRuns),
       result.model,

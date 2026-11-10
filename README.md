@@ -55,7 +55,7 @@ The files in `fixtures/llm-cache` are scripted demo fixtures written by `scripts
 
 ## Evidence-quality score
 
-Deterministic, 0-100, no LLM: required evidence types, delivery verified in fetched data, grounded citations, specific notes, policy citation, 48h timeliness, minus penalties for unsupported claims and contradicted recommendations. Non-contest recommendations are scored on the applicable parts and normalised.
+Deterministic, 0-100, no LLM: required evidence types, delivery verified in fetched data, grounded citations, specific notes, policy citation, 48h timeliness, minus penalties for unsupported claims and contradicted recommendations. The score is only a number for CONTEST drafts. For ACCEPT and OFFER_PARTIAL it is reported as "n/a, not contesting" (the per-part breakdown and penalties are still shown), because it would only measure how well-formed the draft is, not evidence strength. It is separate from the model's stated confidence.
 
 ## Known limitations
 

@@ -16,8 +16,11 @@ export interface ScorePenalty {
   reason: string;
 }
 
+export type ScoreKind = "evidence" | "not_contesting";
+
 export interface ScoreResult {
-  total: number;
+  kind: ScoreKind;
+  total: number | null;
   breakdown: ScorePart[];
   penalties: ScorePenalty[];
   warnings: string[];
@@ -200,10 +203,13 @@ export function scoreDraft({ dispute, draft, toolRuns, now }: ScoreInput): Score
   const applicable = breakdown.filter((p) => p.applicable);
   const maxPoints = applicable.reduce((s, p) => s + p.max, 0);
   const earned = applicable.reduce((s, p) => s + p.points, 0);
+  if (!contest) {
+    return { kind: "not_contesting", total: null, breakdown, penalties, warnings };
+  }
   const normalised = Math.round((earned / maxPoints) * 100);
   const total = Math.max(
     0,
     Math.min(100, normalised + penalties.reduce((s, p) => s + p.points, 0)),
   );
-  return { total, breakdown, penalties, warnings };
+  return { kind: "evidence", total, breakdown, penalties, warnings };
 }

@@ -126,7 +126,7 @@ describe("scoreDraft", () => {
     expect(r.penalties.map((p) => p.key)).toContain("contradiction");
   });
 
-  it("scores an accepted claim on grounding only, normalised to 100", () => {
+  it("scores an accepted claim on grounding only, without a numeric total", () => {
     const d = draft({
       recommendation: "ACCEPT",
       evidences: [],
@@ -139,8 +139,34 @@ describe("scoreDraft", () => {
     });
     expect(part(r, "required_evidence").applicable).toBe(false);
     expect(r.penalties).toEqual([]);
-    expect(r.total).toBeGreaterThanOrEqual(0);
-    expect(r.total).toBeLessThanOrEqual(100);
+    expect(r.kind).toBe("not_contesting");
+    expect(r.total).toBeNull();
+  });
+
+  it("reports no numeric score for an ACCEPT draft with no evidence", () => {
+    const r = scoreDraft({ ...base(), draft: draft({ recommendation: "ACCEPT", evidences: [] }) });
+    expect(r.kind).toBe("not_contesting");
+    expect(r.total).toBeNull();
+    expect(r.breakdown.filter((b) => b.applicable).map((b) => b.key)).toEqual([
+      "grounded_citations",
+      "specific_notes",
+      "timely",
+    ]);
+  });
+
+  it("treats OFFER_PARTIAL like ACCEPT", () => {
+    const r = scoreDraft({
+      ...base(),
+      draft: draft({ recommendation: "OFFER_PARTIAL", evidences: [] }),
+    });
+    expect(r.kind).toBe("not_contesting");
+    expect(r.total).toBeNull();
+  });
+
+  it("marks a CONTEST score as evidence with a numeric total", () => {
+    const r = scoreDraft(base());
+    expect(r.kind).toBe("evidence");
+    expect(r.total).toBe(100);
   });
 
   it("penalises accepting a claim when delivery is verified and signed", () => {
