@@ -17,7 +17,8 @@
     "test": "vitest run",
     "seed": "tsx src/seed.ts",
     "eval": "tsx src/eval/run.ts",
-    "cache:build": "tsx scripts/build-llm-cache.ts"
+    "cache:build": "tsx scripts/build-llm-cache.ts",
+    "cache:build:nvidia": "tsx scripts/build-llm-cache.ts nvidia"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",

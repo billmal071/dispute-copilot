@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { canonicalJson, sha256 } from "../canonical.js";
+import { DEFAULT_NVIDIA_MODEL, NvidiaLLM } from "./nvidia.js";
 
 export const MODEL = "claude-sonnet-5-5";
 
@@ -31,15 +32,23 @@ export interface LLMRequest {
   temperature: number;
 }
 
+export type CacheSource =
+  | "scripted-fixture"
+  | "anthropic"
+  | `anthropic:${string}`
+  | `nvidia:${string}`;
+
 export interface LLMResponse {
   content: ContentBlock[];
   stop_reason: string | null;
   model: string;
+  provenance?: CacheSource;
 }
 
 export interface LLM {
   readonly label: string;
   readonly source: "live" | "replayed";
+  readonly provenance?: CacheSource;
   create(req: LLMRequest): Promise<LLMResponse>;
 }
 
@@ -58,7 +67,7 @@ export function requestKey(req: LLMRequest): string {
 
 export interface CacheEntry {
   key: string;
-  source: "anthropic" | "scripted-fixture";
+  source: CacheSource;
   recorded_at: string;
   response: LLMResponse;
 }
@@ -72,7 +81,11 @@ export class ResponseCache {
 
   get(key: string): CacheEntry | null {
     const p = this.path(key);
-    return existsSync(p) ? (JSON.parse(readFileSync(p, "utf8")) as CacheEntry) : null;
+    if (!existsSync(p)) return null;
+    const entry = JSON.parse(readFileSync(p, "utf8")) as Omit<CacheEntry, "source"> & {
+      source?: CacheSource;
+    };
+    return { ...entry, source: entry.source ?? "scripted-fixture" };
   }
 
   put(entry: CacheEntry): void {
@@ -84,35 +97,48 @@ export class ResponseCache {
 export class ReplayLLM implements LLM {
   readonly label = "replayed";
   readonly source = "replayed" as const;
+  private readonly caches: ResponseCache[];
 
-  constructor(private readonly cache: ResponseCache) {}
+  constructor(caches: ResponseCache | ResponseCache[]) {
+    this.caches = Array.isArray(caches) ? caches : [caches];
+  }
+
+  lookup(key: string): CacheEntry | null {
+    for (const cache of this.caches) {
+      const hit = cache.get(key);
+      if (hit) return hit;
+    }
+    return null;
+  }
 
   async create(req: LLMRequest): Promise<LLMResponse> {
     const key = requestKey(req);
-    const hit = this.cache.get(key);
+    const hit = this.lookup(key);
     if (!hit) throw new ReplayMissError(key);
-    return hit.response;
+    return { ...hit.response, provenance: hit.source };
   }
 }
 
 export class RecordingLLM implements LLM {
   readonly label: string;
   readonly source: "live" | "replayed";
+  readonly provenance: CacheSource | undefined;
 
   constructor(
     private readonly inner: LLM,
     private readonly cache: ResponseCache,
-    private readonly recordedAs: CacheEntry["source"],
+    private readonly recordedAs: CacheSource | undefined = inner.provenance,
   ) {
     this.label = inner.label;
     this.source = inner.source;
+    this.provenance = inner.provenance;
   }
 
   async create(req: LLMRequest): Promise<LLMResponse> {
     const response = await this.inner.create(req);
     this.cache.put({
       key: requestKey(req),
-      source: this.recordedAs,
+      source: this.recordedAs ?? "scripted-fixture",
       recorded_at: new Date().toISOString(),
       response,
     });
@@ -129,6 +155,7 @@ export interface AnthropicLike {
 export class AnthropicLLM implements LLM {
   readonly label = MODEL;
   readonly source = "live" as const;
+  readonly provenance = `anthropic:${MODEL}` as const;
   private readonly client: AnthropicLike;
 
   constructor(apiKeyOrClient: string | AnthropicLike) {
@@ -158,8 +185,41 @@ export class AnthropicLLM implements LLM {
   }
 }
 
-export function createLLM(apiKey: string | undefined, cacheDir: string): LLM {
-  const cache = new ResponseCache(cacheDir);
-  if (apiKey) return new RecordingLLM(new AnthropicLLM(apiKey), cache, "anthropic");
-  return new ReplayLLM(cache);
+export interface LLMSettings {
+  provider: "anthropic" | "nvidia" | "replay";
+  anthropicApiKey?: string | undefined;
+  nvidiaApiKey?: string | undefined;
+  nvidiaModel?: string | undefined;
+}
+
+export interface CacheDirs {
+  scripted: string;
+  nvidia: string;
+  anthropic: string;
+}
+
+export function createLLM(settings: LLMSettings, dirs: CacheDirs): LLM {
+  if (settings.provider === "anthropic") {
+    if (!settings.anthropicApiKey)
+      throw new Error("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY");
+    return new RecordingLLM(
+      new AnthropicLLM(settings.anthropicApiKey),
+      new ResponseCache(dirs.anthropic),
+    );
+  }
+  if (settings.provider === "nvidia") {
+    if (!settings.nvidiaApiKey) throw new Error("LLM_PROVIDER=nvidia requires NVIDIA_API_KEY");
+    return new RecordingLLM(
+      new NvidiaLLM({
+        apiKey: settings.nvidiaApiKey,
+        model: settings.nvidiaModel ?? DEFAULT_NVIDIA_MODEL,
+      }),
+      new ResponseCache(dirs.nvidia),
+    );
+  }
+  return new ReplayLLM([
+    new ResponseCache(dirs.nvidia),
+    new ResponseCache(dirs.anthropic),
+    new ResponseCache(dirs.scripted),
+  ]);
 }

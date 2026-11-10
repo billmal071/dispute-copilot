@@ -23,26 +23,30 @@ Server-rendered Hono plus htmx, fonts (Instrument Serif, Geist, Geist Mono; SIL 
 
 ## Demo fixtures vs live model
 
-The files in `fixtures/llm-cache` are scripted demo fixtures written by `scripts/build-llm-cache.ts`. A fake LLM that follows a fixed tool plan and returns hand-written drafts produced them (`source: "scripted-fixture"`), and no Claude model was called. They exist so the app, the approval flow and the score run offline with no credentials. Their drafts and the replay eval numbers say nothing about model quality. With `ANTHROPIC_API_KEY` set, the same agent loop calls `claude-sonnet-5-5`, the UI shows the live model name, and responses are recorded into the cache as `source: "anthropic"`.
+The files in `fixtures/llm-cache` are scripted demo fixtures written by `scripts/build-llm-cache.ts`. A fake LLM that follows a fixed tool plan and returns hand-written drafts produced them (`source: "scripted-fixture"`), and no Claude model was called. They exist so the app, the approval flow and the score run offline with no credentials. Their drafts and the replay eval numbers say nothing about model quality. With `NVIDIA_API_KEY` or `ANTHROPIC_API_KEY` set, the same agent loop calls a real model, the UI shows its name, and responses are recorded into a separate directory (see Modes) so the scripted fixtures are never overwritten.
 
 ## Commands
 
-| Command                              | What it does                                                                                  |
-| ------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `npm start` / `npm run dev`          | Run the server (dev watches)                                                                  |
-| `npm run build`                      | Compile to `dist/`                                                                            |
-| `npm test`                           | Unit and route tests (no network)                                                             |
-| `npm run typecheck` / `npm run lint` | tsc strict / Biome                                                                            |
-| `npm run seed`                       | Reset the local DB and mock disputes                                                          |
-| `npm run eval`                       | Run the agent over all 13 scenarios, write `eval/results.md`                                  |
-| `npm run cache:build`                | Regenerate scripted fixture recordings (needed after changing the prompt, tools or seed data) |
+| Command                              | What it does                                                                                                      |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `npm start` / `npm run dev`          | Run the server (dev watches)                                                                                      |
+| `npm run build`                      | Compile to `dist/`                                                                                                |
+| `npm test`                           | Unit and route tests (no network)                                                                                 |
+| `npm run typecheck` / `npm run lint` | tsc strict / Biome                                                                                                |
+| `npm run seed`                       | Reset the local DB and mock disputes                                                                              |
+| `npm run eval`                       | Run the agent over all 13 scenarios, write `eval/results.md`                                                      |
+| `npm run cache:build`                | Regenerate scripted fixture recordings (needed after changing the prompt, tools or seed data)                     |
+| `npm run cache:build:nvidia`         | Record real NVIDIA model responses for all 13 scenarios into `fixtures/llm-cache-nvidia` (needs `NVIDIA_API_KEY`) |
 
 ## Modes
 
 - `MODE=mock`: `MockPayPal` with seeded disputes, transactions, tracking and Disputes-API-like write endpoints (status rules, validation, `PayPal-Request-Id` idempotency).
 - `MODE=sandbox`: `SandboxPayPal` against `api-m.sandbox.paypal.com`. Set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` from a Merchant sandbox app with "Customer disputes" enabled. Several response shapes are unverified; see `docs/unverified.md`.
 - `HOST` (default `127.0.0.1`) and `PORT` (default 3000) control the bind address; `.env` is loaded at startup and never overrides real environment variables.
-- `ANTHROPIC_API_KEY` set: real calls to `claude-sonnet-5-5`, recorded into the cache.
+- `LLM_PROVIDER` (`anthropic`, `nvidia` or `replay`) picks the model. Unset, it is `anthropic` if `ANTHROPIC_API_KEY` is set, else `nvidia` if `NVIDIA_API_KEY` is set, else `replay`.
+- `ANTHROPIC_API_KEY` set: real calls to `claude-sonnet-5-5`, recorded into `fixtures/llm-cache-anthropic` as `source: "anthropic:<model>"`.
+- `NVIDIA_API_KEY` set: real calls through NVIDIA's OpenAI-compatible API (`https://integrate.api.nvidia.com/v1`) to `NVIDIA_MODEL` (default `mistralai/mistral-large-4-1t-a52b`, chosen because it was callable with function calling on a free key on 2026-11-10; several other catalog entries, such as `nvidia/nemotron-3-super-120b-a12b`, returned 404 for that key). Recorded into `fixtures/llm-cache-nvidia` as `source: "nvidia:<model>"`. `npm run cache:build:nvidia` records all 13 scenarios there and never touches the scripted fixtures.
+- Replay without a key searches `fixtures/llm-cache-nvidia`, then `fixtures/llm-cache-anthropic`, then the scripted `fixtures/llm-cache`. Each draft is labelled from the `source` of the entry it replayed: "Scripted demo fixture" (no source, or `scripted-fixture`), "Recorded real model output: <model>" (replayed `nvidia:` or `anthropic:` entries), or "Real model: <model> via NVIDIA, recorded" for a live NVIDIA call.
 
 ## Safety model
 

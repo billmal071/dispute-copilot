@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import {
   type LLM,
   type LLMRequest,
@@ -6,10 +5,14 @@ import {
   RecordingLLM,
   ResponseCache,
 } from "../src/agent/llm.js";
+import { NvidiaLLM } from "../src/agent/nvidia.js";
 import { runAgent } from "../src/agent/run.js";
 import { SUBMIT_TOOL } from "../src/agent/tools.js";
+import { LLM_CACHE_DIRS } from "../src/app.js";
 import { DEMO_NOW } from "../src/clock.js";
+import { loadConfig } from "../src/config.js";
 import { openDb } from "../src/db.js";
+import { loadDotenv } from "../src/env.js";
 import { createMerchantData } from "../src/merchant/data.js";
 import { readOnly } from "../src/paypal/client.js";
 import { MockPayPal, seedMock } from "../src/paypal/mock.js";
@@ -31,6 +34,7 @@ function scriptedLLM(s: Scenario): LLM {
   ];
   return {
     label: "scripted-fixture",
+    provenance: "scripted-fixture",
     source: "replayed",
     async create(req: LLMRequest): Promise<LLMResponse> {
       const turn = req.messages.filter((m) => m.role === "assistant").length;
@@ -49,19 +53,36 @@ function scriptedLLM(s: Scenario): LLM {
   };
 }
 
-const cache = new ResponseCache(join(import.meta.dirname, "..", "fixtures", "llm-cache"));
+loadDotenv();
+const nvidiaMode = process.argv[2] === "nvidia";
+
+function recorder(scenario: Scenario): { llm: LLM; label: string } {
+  if (!nvidiaMode) {
+    const cache = new ResponseCache(LLM_CACHE_DIRS.scripted);
+    return { llm: new RecordingLLM(scriptedLLM(scenario), cache), label: "scripted" };
+  }
+  const config = loadConfig({ ...process.env, LLM_PROVIDER: "" });
+  if (!config.nvidiaApiKey) {
+    console.error("NVIDIA_API_KEY is required for the nvidia mode. Add it to .env.");
+    process.exit(1);
+  }
+  const cache = new ResponseCache(LLM_CACHE_DIRS.nvidia);
+  const inner = new NvidiaLLM({ apiKey: config.nvidiaApiKey, model: config.nvidiaModel });
+  return { llm: new RecordingLLM(inner, cache), label: config.nvidiaModel };
+}
 
 for (const scenario of SCENARIOS) {
   const db = openDb(":memory:");
   seedMock(db, SCENARIOS);
+  const { llm, label } = recorder(scenario);
   const result = await runAgent({
     disputeId: scenario.dispute.dispute_id,
     reader: readOnly(new MockPayPal(db, SCENARIOS)),
     merchant: createMerchantData(db, SCENARIOS),
-    llm: new RecordingLLM(scriptedLLM(scenario), cache, "scripted-fixture"),
+    llm,
     now: new Date(DEMO_NOW),
   });
   console.log(
-    `${scenario.slug}: ${result.state} ${result.draft?.recommendation ?? result.error} score=${result.score?.total}`,
+    `${scenario.slug} [${label}]: ${result.state} ${result.draft?.recommendation ?? result.error} score=${result.score?.total}`,
   );
 }

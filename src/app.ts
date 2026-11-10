@@ -23,11 +23,25 @@ export interface AppContext {
   verify: SignatureVerifier;
 }
 
-export const LLM_CACHE_DIR = join(import.meta.dirname, "..", "fixtures", "llm-cache");
+const FIXTURES = join(import.meta.dirname, "..", "fixtures");
+export const LLM_CACHE_DIR = join(FIXTURES, "llm-cache");
+export const LLM_CACHE_DIRS = {
+  scripted: LLM_CACHE_DIR,
+  nvidia: join(FIXTURES, "llm-cache-nvidia"),
+  anthropic: join(FIXTURES, "llm-cache-anthropic"),
+};
 
 export function createContext(config: Config): AppContext {
   const db = openDb(config.dbPath);
-  const llm = createLLM(config.anthropicApiKey, LLM_CACHE_DIR);
+  const llm = createLLM(
+    {
+      provider: config.llmProvider,
+      anthropicApiKey: config.anthropicApiKey,
+      nvidiaApiKey: config.nvidiaApiKey,
+      nvidiaModel: config.nvidiaModel,
+    },
+    LLM_CACHE_DIRS,
+  );
   const merchant = createMerchantData(db, SCENARIOS);
 
   if (config.mode === "mock") {

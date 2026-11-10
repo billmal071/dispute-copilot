@@ -1,6 +1,7 @@
 import type { Payload } from "../actions/approve.js";
 import type { StoredDraft } from "../agent/draft.js";
 import { sameAddress } from "../agent/facts.js";
+import { provenanceLabel } from "../agent/provenance.js";
 import type { AuditRow, ChainResult } from "../audit.js";
 import type { Dispute, DisputeReason, Order, ToolRun, Tracking, Transaction } from "../types.js";
 import { h, raw, type Safe } from "./html.js";
@@ -416,9 +417,6 @@ export function decisionPanel(
 </div>`;
 }
 
-const SOURCE_NOTE =
-  "Pre-written draft from fixtures/llm-cache. This is not real Claude output. Set ANTHROPIC_API_KEY for a live model draft.";
-
 export function draftPanel(
   draft: StoredDraft,
   ctx: {
@@ -440,14 +438,15 @@ export function draftPanel(
         : 0;
   const ledger = checklistFor(draft);
   const count = (state: string) => ledger.filter((i) => i.state === state).length;
-  const sourceChip =
-    draft.source === "replayed"
-      ? h`<span class="chip fixture" title="${SOURCE_NOTE}">${icon.file}Scripted demo fixture</span>`
-      : h`<span class="chip live">${icon.shield}Live · ${draft.model}</span>`;
+  const provenance = provenanceLabel(draft.model, draft.source);
+  const scripted = provenance.note !== null;
+  const sourceChip = scripted
+    ? h`<span class="chip fixture" title="${provenance.note}">${icon.file}${provenance.chip}</span>`
+    : h`<span class="chip live">${icon.shield}${provenance.chip}</span>`;
   return h`<div id="draft-panel" class="panel draft reveal">
 <form id="draft-form" hx-post="/drafts/${draft.id}/preview" hx-target="#modal-slot" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">
   <div class="draft-top"><span class="eyebrow">Agent draft · v${draft.version}</span>${sourceChip}</div>
-  ${draft.source === "replayed" ? h`<p class="fixture-note">${SOURCE_NOTE}</p>` : ""}
+  ${provenance.note ? h`<p class="fixture-note">${provenance.note}</p>` : ""}
   <div class="verdict">
     ${gauge(draft.score, contest)}
     <div class="verdict-text">

@@ -49,7 +49,7 @@ describe("response cache", () => {
     };
     await new RecordingLLM(inner, cache, "anthropic").create(req("x"));
     const replayed = await new ReplayLLM(cache).create(req("x"));
-    expect(replayed).toEqual(resp);
+    expect(replayed).toEqual({ ...resp, provenance: "anthropic" });
     expect(calls).toBe(1);
   });
 
