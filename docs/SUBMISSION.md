@@ -47,8 +47,8 @@ Not verified (do not claim as working against PayPal):
 
 ## Honest disclosures
 
-- No Anthropic API key was available. Every draft in the demo comes from scripted fixtures (`fixtures/llm-cache`, `source: "scripted-fixture"`), written by hand and replayed by a fake LLM following a fixed tool plan. The UI labels them "Scripted demo fixture, not real Claude output". The agent loop is written for `claude-sonnet-5-5` and activates when `ANTHROPIC_API_KEY` is set, but it has never been run against a live model in this submission.
-- Because of that, the eval (13 scenarios, 100% recommendation accuracy, mean contest score 91.9) is a cache integrity check, not a measure of model quality.
+- No Anthropic API key was available, so the demo runs on two honestly labelled sources. The default replay uses real drafts recorded from NVIDIA's `nvidia/nemotron-3.5-lightning-30b-a3b` (`fixtures/llm-cache-nvidia`, shown as "Recorded real model output"; a handful of Mistral Large 4 drafts are mixed in and labelled individually). Hand-written scripted fixtures (`fixtures/llm-cache`, "Scripted demo fixture") remain as the last fallback. Set `NVIDIA_API_KEY` and `LLM_PROVIDER=nvidia` to run live. The Anthropic agent loop (`claude-sonnet-5-5`) has never been run against a live model in this submission.
+- Eval on the recorded real drafts (13 scenarios, single run, agent only, no baseline): 69% recommendation accuracy (9 of 13), mean contest score 64.4, 2 ungrounded claims. Misses: it contested `lost-in-transit` and `listing-wrong` (should accept), accepted `partial-refund-buyer-wants-full` (should offer partial) and `missing-tracking-needs-merchant` (should contest). The human approval gate exists for exactly these errors.
 - The evidence tracking number in the real sandbox write was a labelled placeholder, not a real shipment.
 - No claims are made about real merchants, savings, or win rates. There is no baseline comparison.
 - No authentication; single merchant user.
