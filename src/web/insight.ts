@@ -207,6 +207,87 @@ export function outboundRequest(
   };
 }
 
+export function firstSentence(text: string, max = 190): string {
+  const trimmed = text.trim();
+  const end = /[.!?](?=\s+[A-Z"(]|$)/.exec(trimmed);
+  const sentence = end ? trimmed.slice(0, end.index + 1) : trimmed;
+  if (sentence.length <= max) return sentence;
+  const cut = sentence.slice(0, max - 1);
+  return `${cut.slice(0, cut.lastIndexOf(" ") > 40 ? cut.lastIndexOf(" ") : cut.length).trimEnd()}\u2026`;
+}
+
+export function plainWords(text: string): string {
+  return text.replace(/\b[A-Z]{2,}(?:_[A-Z]+)+\b/g, (code) =>
+    code.toLowerCase().replace(/_/g, " "),
+  );
+}
+
+export function decisionHeadline(recommendation: string, offerAmount: string | null): string {
+  if (recommendation === "ACCEPT") return "Accept this claim";
+  if (recommendation === "CONTEST") return "Contest this dispute";
+  return offerAmount ? `Offer a partial refund of ${offerAmount}` : "Offer a partial refund";
+}
+
+export function confidenceWord(confidence: number): "High" | "Medium" | "Low" {
+  return confidence >= 0.8 ? "High" : confidence >= 0.5 ? "Medium" : "Low";
+}
+
+export interface DueWords {
+  text: string;
+  tone: "urgent" | "warn" | "ok" | "none";
+}
+
+export function dueWords(due: string | null, now: Date): DueWords {
+  const hours = hoursLeft(due, now);
+  if (hours === null) return { text: "No deadline", tone: "none" };
+  if (hours <= 0) return { text: "Overdue", tone: "urgent" };
+  if (hours < 24) {
+    const n = Math.max(1, Math.round(hours));
+    return { text: `Due in ${n} ${n === 1 ? "hour" : "hours"}`, tone: "urgent" };
+  }
+  const days = Math.floor(hours / 24);
+  const tone = hours < 72 ? "warn" : "ok";
+  return { text: days === 1 ? "Due tomorrow" : `Due in ${days} days`, tone };
+}
+
+export interface SendSummary {
+  headline: string;
+  points: string[];
+}
+
+export function sendSummary(payload: Payload, amount: string): SendSummary {
+  switch (payload.kind) {
+    case "provide-evidence": {
+      const n = payload.request.evidences.length;
+      return {
+        headline: `Contest this dispute with ${n} ${n === 1 ? "piece" : "pieces"} of evidence`,
+        points: [
+          "PayPal reviews your evidence and decides the dispute.",
+          "Until PayPal decides, the dispute stays open.",
+        ],
+      };
+    }
+    case "accept-claim":
+      return {
+        headline: `Accept the buyer's claim for ${amount}`,
+        points: [
+          `Reason given to PayPal: ${payload.request.accept_claim_reason.replace(/_/g, " ").toLowerCase()}.`,
+          `The buyer is refunded ${amount} and the dispute closes in their favour.`,
+        ],
+      };
+    case "make-offer": {
+      const o = payload.request.offer_amount;
+      return {
+        headline: `Offer the buyer a partial refund of ${o.value} ${o.currency_code}`,
+        points: [
+          "The buyer can accept or decline the offer.",
+          "If they decline, the dispute stays open and can escalate.",
+        ],
+      };
+    }
+  }
+}
+
 export type RouteKey = "inbox" | "dispute" | "audit" | "notfound" | "error";
 
 export interface PageMeta {

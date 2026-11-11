@@ -4,11 +4,17 @@ import { createDraft, latestDraft } from "../src/agent/draft.js";
 import type { Dispute } from "../src/types.js";
 import {
   checklistFor,
+  confidenceWord,
   deadlineRing,
+  decisionHeadline,
+  dueWords,
+  firstSentence,
   outboundRequest,
   pageMeta,
+  plainWords,
   rankRows,
   relevantFacts,
+  sendSummary,
   winChance,
 } from "../src/web/insight.js";
 import type { InboxRow } from "../src/web/views.js";
@@ -211,5 +217,96 @@ describe("relevantFacts", () => {
       new Set(["listing", "refunds"]),
     );
     expect(relevantFacts("CANCELED_RECURRING_BILLING")).toEqual(new Set(["access"]));
+  });
+});
+
+describe("plain-language helpers", () => {
+  it("takes the first sentence of the reasoning and caps its length", () => {
+    expect(firstSentence("Delivery is confirmed. The address matches.")).toBe(
+      "Delivery is confirmed.",
+    );
+    expect(firstSentence("No full stop here")).toBe("No full stop here");
+    expect(firstSentence("")).toBe("");
+    const long = firstSentence(`${"word ".repeat(80)}done.`, 100);
+    expect(long.length).toBeLessThanOrEqual(100);
+    expect(long.endsWith("\u2026")).toBe(true);
+  });
+
+  it("does not split a sentence on a decimal point or an abbreviation-like dot inside a number", () => {
+    expect(firstSentence("Refund of $12.50 was issued. Buyer agreed.")).toBe(
+      "Refund of $12.50 was issued.",
+    );
+  });
+
+  it("turns SCREAMING_CASE codes in agent text into lower-case words", () => {
+    expect(plainWords("filed a MERCHANDISE_OR_SERVICE_NOT_RECEIVED dispute")).toBe(
+      "filed a merchandise or service not received dispute",
+    );
+    expect(plainWords("Status OK and PP-D-1001 stay as written")).toBe(
+      "Status OK and PP-D-1001 stay as written",
+    );
+    expect(plainWords("")).toBe("");
+  });
+
+  it("words the decision for each recommendation", () => {
+    expect(decisionHeadline("ACCEPT", null)).toBe("Accept this claim");
+    expect(decisionHeadline("CONTEST", null)).toBe("Contest this dispute");
+    expect(decisionHeadline("OFFER_PARTIAL", "$20.00")).toBe("Offer a partial refund of $20.00");
+    expect(decisionHeadline("OFFER_PARTIAL", null)).toBe("Offer a partial refund");
+  });
+
+  it("maps confidence to a word", () => {
+    expect(confidenceWord(0.9)).toBe("High");
+    expect(confidenceWord(0.6)).toBe("Medium");
+    expect(confidenceWord(0.2)).toBe("Low");
+  });
+
+  it("says when a response is due in words and marks the urgency", () => {
+    expect(dueWords(inHours(-5), NOW)).toEqual({ text: "Overdue", tone: "urgent" });
+    expect(dueWords(inHours(3), NOW)).toEqual({ text: "Due in 3 hours", tone: "urgent" });
+    expect(dueWords(inHours(0.2), NOW)).toEqual({ text: "Due in 1 hour", tone: "urgent" });
+    expect(dueWords(inHours(30), NOW)).toEqual({ text: "Due tomorrow", tone: "warn" });
+    expect(dueWords(inHours(60), NOW)).toEqual({ text: "Due in 2 days", tone: "warn" });
+    expect(dueWords(inHours(24 * 6), NOW)).toEqual({ text: "Due in 6 days", tone: "ok" });
+    expect(dueWords(null, NOW)).toEqual({ text: "No deadline", tone: "none" });
+  });
+
+  it("summarises what will be sent for each kind of request", () => {
+    const evidence = {
+      kind: "provide-evidence",
+      request: {
+        evidences: [
+          { evidence_type: "PROOF_OF_FULFILLMENT", notes: "x" },
+          { evidence_type: "OTHER", notes: "y" },
+        ],
+      },
+    } as never;
+    expect(sendSummary(evidence, "$50.00").headline).toBe(
+      "Contest this dispute with 2 pieces of evidence",
+    );
+    const one = {
+      kind: "provide-evidence",
+      request: { evidences: [{ evidence_type: "OTHER", notes: "y" }] },
+    } as never;
+    expect(sendSummary(one, "$50.00").headline).toBe(
+      "Contest this dispute with 1 piece of evidence",
+    );
+    const accept = {
+      kind: "accept-claim",
+      request: { note: "n", accept_claim_reason: "DID_NOT_SHIP_ITEM" },
+    } as never;
+    expect(sendSummary(accept, "$50.00").headline).toBe("Accept the buyer's claim for $50.00");
+    expect(sendSummary(accept, "$50.00").points.join(" ")).toContain("did not ship item");
+    const offer = {
+      kind: "make-offer",
+      request: {
+        note: "n",
+        offer_amount: { currency_code: "USD", value: "20.00" },
+        offer_type: "REFUND",
+      },
+    } as never;
+    expect(sendSummary(offer, "$50.00").headline).toBe(
+      "Offer the buyer a partial refund of 20.00 USD",
+    );
   });
 });
