@@ -17,6 +17,6 @@ export function provenanceLabel(model: string, source: "live" | "replayed"): Pro
       : { chip: "Scripted demo fixture", note: SCRIPTED_NOTE };
   }
   return vendor === "nvidia"
-    ? { chip: `Real model: ${name} via NVIDIA, recorded`, note: null }
+    ? { chip: `Real model: ${name} via NVIDIA, live`, note: null }
     : { chip: `Live · ${name}`, note: null };
 }

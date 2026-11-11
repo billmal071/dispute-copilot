@@ -67,7 +67,7 @@ describe("provenanceLabel", () => {
 
   it("labels a live NVIDIA draft with the real model name", () => {
     const l = provenanceLabel("nvidia:nvidia/some-model", "live");
-    expect(l.chip).toBe("Real model: nvidia/some-model via NVIDIA, recorded");
+    expect(l.chip).toBe("Real model: nvidia/some-model via NVIDIA, live");
     expect(l.note).toBeNull();
   });
 
