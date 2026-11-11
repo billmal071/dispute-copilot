@@ -401,6 +401,8 @@ export function createServer(ctx: AppContext): Server {
           idempotencyKey: randomUUID(),
           edits: changed,
           fields: passthroughFields(form),
+          amount: dispute.dispute_amount,
+          buyer: dispute.disputed_transactions[0]?.buyer.name ?? null,
         }).toString(),
       );
     } catch (err) {

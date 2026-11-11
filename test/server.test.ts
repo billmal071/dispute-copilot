@@ -54,7 +54,7 @@ describe("dispute detail", () => {
     expect(res.status).toBe(200);
     expect(html).toContain("5TX10010042");
     expect(html).toContain("JD0146100177");
-    expect(html).toContain("Draft with agent");
+    expect(html).toContain("Draft a response");
   });
 
   it("escapes buyer-controlled text", async () => {
@@ -85,7 +85,7 @@ describe("drafting", () => {
     const { server } = await setup();
     const { res, html } = await draftFor(server);
     expect(res.status).toBe(200);
-    expect(html).toContain("CONTEST");
+    expect(html).toContain("Recommend: Contest this dispute");
     expect(html).toContain("Scripted demo fixture");
     expect(html).toContain("get_tracking");
     expect(html).toContain("Required evidence present");

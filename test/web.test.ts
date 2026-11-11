@@ -113,8 +113,8 @@ describe("inbox ordering and summary", () => {
   it("shows the agent state, win chance and deadline ring on each row", async () => {
     const { server } = await setup(true);
     const html = await (await server.request("/")).text();
-    expect(html).toContain("Drafted");
-    expect(html).toContain("Not drafted");
+    expect(html).toContain("Draft ready");
+    expect(html).toContain("Needs a draft");
     expect(html).toMatch(/class="ring [a-z]+"/);
     expect(html).toMatch(/data-win="\d+"/);
   });
@@ -136,12 +136,12 @@ describe("dispute page", () => {
   it("shows no numeric evidence score when the agent is not contesting", async () => {
     const { server } = await setup(true);
     const html = await (await server.request("/disputes/PP-D-1002")).text();
-    expect(html).toContain("ACCEPT");
+    expect(html).toContain("Recommend: Accept this claim");
     expect(html).toContain("Evidence score: n/a, not contesting");
     expect(html).not.toMatch(/data-score="/);
     expect(html).not.toContain("/ 100");
     expect(html).toContain('data-part="grounded_citations"');
-    expect(html).toContain("Confidence ");
+    expect(html).toMatch(/Confidence<\/dt><dd>(High|Medium|Low) <span class="tnum">\d+%/);
   });
 
   it("keeps the evidence score for a contest", async () => {
@@ -165,7 +165,7 @@ describe("dispute page", () => {
     const html = await (await server.request("/disputes/PP-D-1001")).text();
     expect(html).toContain('class="drafting"');
     expect(html).toContain('aria-live="polite"');
-    expect(html).toContain("Draft with agent");
+    expect(html).toContain("Draft a response");
   });
 
   it("puts the exact outbound request in the approval sheet", async () => {
@@ -198,5 +198,77 @@ describe("dispute page", () => {
     expect(out).toContain('class="stamp"');
     expect(out).toContain("Sent to PayPal");
     expect(out).toContain("/audit?dispute=PP-D-1001");
+  });
+});
+
+describe("redesigned screens", () => {
+  it("states each inbox deadline in words and the next step in words, never a code", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/")).text();
+    expect(html).toMatch(/Due (in \d+ (hours?|days)|tomorrow)|Overdue/);
+    expect(html).toContain("Needs a draft");
+    expect(html).not.toMatch(/WAITING_FOR_SELLER_RESPONSE|OFFER_PARTIAL/);
+    expect(html).toContain('class="mode mock"');
+  });
+
+  it("explains the dispute in plain words with one primary action on the case page", async () => {
+    const { server } = await setup();
+    const html = await (await server.request("/disputes/PP-D-1001")).text();
+    expect(html).toContain('class="claim-plain"');
+    expect(html).toMatch(/says (they|the item|it)/);
+    expect(html.match(/class="btn primary[^"]*"/g)).toHaveLength(1);
+    expect(html).toContain('<details class="casefile"');
+  });
+
+  it("leads the draft with the decision, a one-line reason and the approve button", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/disputes/PP-D-1002")).text();
+    expect(html).toContain("Recommend: Accept this claim");
+    expect(html).toContain('class="verdict-why"');
+    expect(html).toContain("Review &amp; approve");
+    expect(html).toContain("Reject");
+    expect(html).toContain("Scripted demo fixture");
+    expect(html).toContain('class="mode mock"');
+  });
+
+  it("puts the contest decision first and the supporting detail behind labelled sections", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/disputes/PP-D-1001")).text();
+    expect(html).toContain("Recommend: Contest this dispute");
+    for (const label of [
+      "Evidence ledger",
+      "Score breakdown",
+      "Why the agent decided this",
+      "Edit what gets sent",
+      "Tool trace",
+    ]) {
+      expect(html, label).toMatch(
+        new RegExp(`<details class="dt[^"]*"[^>]*><summary[^>]*>[\\s\\S]*?${label}`),
+      );
+    }
+    expect(html.indexOf("Recommend:")).toBeLessThan(html.indexOf("Evidence ledger"));
+  });
+
+  it("keeps editable notes inside the approve form so edits are still submitted", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/disputes/PP-D-1001")).text();
+    const form = /<form id="draft-form"[\s\S]*?<\/form>/.exec(html)?.[0] ?? "";
+    expect(form).toContain('name="note_0"');
+    const accept = await (await server.request("/disputes/PP-D-1002")).text();
+    expect(/<form id="draft-form"[\s\S]*?<\/form>/.exec(accept)?.[0]).toContain(
+      'name="merchant_message"',
+    );
+  });
+
+  it("summarises the send in plain language with an irreversible warning above the exact request", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/disputes/PP-D-1001")).text();
+    const draftId = attr(html, /hx-post="\/drafts\/(\d+)\/preview"/);
+    const sheet = await (await server.request(`/drafts/${draftId}/preview`, form({}))).text();
+    expect(sheet).toContain('class="send-summary"');
+    expect(sheet).toContain("Contest this dispute with");
+    expect(sheet).toContain("cannot be undone");
+    expect(sheet.indexOf("cannot be undone")).toBeLessThan(sheet.indexOf("provide-evidence"));
+    expect(sheet.match(/class="btn primary/g)).toHaveLength(1);
   });
 });
