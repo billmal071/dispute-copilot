@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { getCookie, setCookie } from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import {
   AlreadyDecidedError,
   ApprovalRequiredError,
@@ -162,6 +162,7 @@ function hostAllowed(hostHeader: string | undefined, extra: string[]): boolean {
 }
 
 const CSRF_COOKIE = "dc_csrf";
+const FLASH_COOKIE = "dc_flash";
 const CSRF_EXEMPT = new Set(["/webhooks/paypal"]);
 
 function csrfGuard(secret: Buffer) {
@@ -313,8 +314,9 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
         decision: decision?.decision ?? null,
       };
     });
-    const syncedParam = c.req.query("synced");
-    const synced = syncedParam && /^\d{1,6}$/.test(syncedParam) ? Number(syncedParam) : undefined;
+    const flash = /^synced-(\d{1,6})$/.exec(getCookie(c, FLASH_COOKIE) ?? "");
+    const synced = flash ? Number(flash[1]) : undefined;
+    if (getCookie(c, FLASH_COOKIE) !== undefined) deleteCookie(c, FLASH_COOKIE, { path: "/" });
     return c.html(page(c, "inbox", "inbox", inboxPage(rows, ctx.clock.now(), ctx.mode, synced)));
   });
 
@@ -338,7 +340,13 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
         502,
       );
     }
-    return c.redirect(`/?synced=${synced}`, 303);
+    setCookie(c, FLASH_COOKIE, `synced-${synced}`, {
+      httpOnly: true,
+      sameSite: "Strict",
+      path: "/",
+      maxAge: 30,
+    });
+    return c.redirect("/", 303);
   });
 
   app.get("/disputes/:id", async (c) => {

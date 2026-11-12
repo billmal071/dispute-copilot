@@ -407,7 +407,7 @@ export interface Decision {
 }
 
 const modeName = (mode: "mock" | "sandbox") =>
-  mode === "mock" ? "PayPal simulator" : "PayPal sandbox";
+  mode === "mock" ? "Mock simulator" : "PayPal sandbox";
 
 function auditMini(rows: AuditRow[], disputeId: string): Safe {
   return h`<div class="receipt-audit"><h3>Audit entry</h3>
@@ -547,10 +547,10 @@ export function draftPanel(
   ${(d.flags ?? []).map((f) => h`<div class="callout warn">${icon.flag}<div><strong>Flagged:</strong> ${plainWords(f)}</div></div>`)}
   <div class="actions">
     <button class="btn primary big" type="submit">Review &amp; approve${icon.arrow}<span class="spinner htmx-indicator" aria-hidden="true"></span></button>
-    <button class="btn danger" type="button" hx-post="/drafts/${draft.id}/reject" hx-vals='${JSON.stringify({ idempotency_key: `${ctx.idempotencyKey}-reject` })}' hx-target="#draft-panel" hx-swap="outerHTML" hx-confirm="Reject this draft? Nothing will be sent to PayPal.">Reject</button>
+    <div id="draft-error"></div>
+    <button class="btn danger" type="button" hx-post="/drafts/${draft.id}/reject" hx-vals='${JSON.stringify({ idempotency_key: `${ctx.idempotencyKey}-reject` })}' hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="this" hx-confirm="Reject this draft? Nothing will be sent to PayPal.">Reject</button>
     <p class="hint">You see the exact ${ctx.mode === "mock" ? "(simulated) " : ""}PayPal request before anything is sent.</p>
   </div>
-  <div id="draft-error"></div>
   <div class="details-stack">
     <h3 class="details-h">Details</h3>
     ${detailSection("Why the agent decided this", plainWords(firstSentence(d.reasoning, 80)), reasoningBody)}

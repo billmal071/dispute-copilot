@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AppContext } from "../src/app.js";
 import { prefillDemoDrafts } from "../src/seed/prefill.js";
 import { createServer } from "../src/server.js";
+import { decisionPanel } from "../src/web/views.js";
 import { makeApp } from "./app-helpers.js";
 import { startSession, withSession } from "./csrf-helpers.js";
 
@@ -270,5 +271,58 @@ describe("redesigned screens", () => {
     expect(sheet).toContain("cannot be undone");
     expect(sheet.indexOf("cannot be undone")).toBeLessThan(sheet.indexOf("provide-evidence"));
     expect(sheet.match(/class="btn primary/g)).toHaveLength(1);
+  });
+});
+
+describe("sent stamp wording", () => {
+  const sentPanel = (mode: "mock" | "sandbox") =>
+    decisionPanel(
+      { id: 1, dispute_id: "PP-D-1001", version: 1 } as never,
+      {
+        decision: "approve",
+        decidedBy: "merchant",
+        decidedAt: "2026-01-01T00:00:00.000Z",
+        action: {
+          kind: "provide_evidence",
+          status: "ok",
+          attempts: 1,
+          response: {},
+          request_id: "r",
+        },
+      } as never,
+      mode,
+    ).toString();
+  const stamp = (html: string) => /<div class="stamp"[\s\S]*?<\/div>/.exec(html)?.[0] ?? "";
+
+  it("says MOCK, never sandbox, in mock mode", () => {
+    const s = stamp(sentPanel("mock"));
+    expect(s).toMatch(/mock/i);
+    expect(s).not.toMatch(/sandbox/i);
+  });
+
+  it("says PayPal sandbox, never mock, in sandbox mode", () => {
+    const s = stamp(sentPanel("sandbox"));
+    expect(s).toMatch(/sandbox/i);
+    expect(s).not.toMatch(/mock/i);
+  });
+});
+
+describe("validation error placement", () => {
+  it("sits directly under the approve button, before the hint and the details", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/disputes/PP-D-1001")).text();
+    const at = (needle: string, from = 0) => html.indexOf(needle, from);
+    expect(at('id="draft-error"')).toBeGreaterThan(at("Review &amp; approve"));
+    expect(at('id="draft-error"')).toBeLessThan(at('class="hint"', at("Review &amp; approve")));
+    expect(at('id="draft-error"')).toBeLessThan(at('class="details-stack"'));
+  });
+});
+
+describe("htmx disabled-elt selectors", () => {
+  it("gives the reject button its own target instead of inheriting the form's submit selector", async () => {
+    const { server } = await setup(true);
+    const html = await (await server.request("/disputes/PP-D-1001")).text();
+    const reject = /<button[^>]*hx-post="\/drafts\/\d+\/reject"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(reject).toContain('hx-disabled-elt="this"');
   });
 });

@@ -93,15 +93,30 @@ describe("audit and sync feedback", () => {
     expect(all).toMatch(/\d+ entries across all disputes/);
   });
 
-  it("confirms a sync with a flash on the inbox", async () => {
+  it("confirms a sync with a one-shot flash cookie, not a URL parameter", async () => {
     const { server } = await setup();
     const res = await server.request("/sync", { method: "POST" });
     expect(res.status).toBe(303);
-    const location = res.headers.get("location") ?? "";
-    expect(location).toMatch(/^\/\?synced=\d+$/);
-    const html = await (await server.request(location)).text();
-    expect(html).toMatch(/role="status"[^>]*>[\s\S]*Synced \d+ disputes?/);
+    expect(res.headers.get("location")).toBe("/");
+    const flash = res.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0] ?? "")
+      .find((c) => c.startsWith("dc_flash="));
+    expect(flash).toMatch(/^dc_flash=synced-\d+$/);
+
+    const shown = await server.request("/", { headers: { cookie: flash ?? "" } });
+    expect(await shown.text()).toMatch(/role="status"[^>]*>[\s\S]*Synced \d+ disputes?/);
+    const cleared = shown.headers.getSetCookie().find((c) => c.startsWith("dc_flash="));
+    expect(cleared).toMatch(/Max-Age=0/i);
+
     expect(await (await server.request("/")).text()).not.toContain("Synced");
+  });
+
+  it("ignores a legacy ?synced= parameter and a malformed flash cookie", async () => {
+    const { server } = await setup();
+    expect(await (await server.request("/?synced=5")).text()).not.toContain("Synced 5");
+    const bad = await server.request("/", { headers: { cookie: "dc_flash=<b>x</b>" } });
+    expect(await bad.text()).not.toContain("Synced");
   });
 });
 

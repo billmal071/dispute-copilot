@@ -2710,6 +2710,7 @@ dialog.sheet {
   .nav a,
   .icon-btn,
   .brand,
+  .skip,
   .btn,
   .case-link,
   .crumb,
@@ -2720,12 +2721,14 @@ dialog.sheet {
   }
   .nav a,
   .brand,
+  .skip,
   .crumb,
   .ev-link {
     display: inline-flex;
     align-items: center;
   }
-  .icon-btn {
+  .icon-btn,
+  .brand {
     min-width: 44px;
   }
   .btn {
@@ -2738,12 +2741,9 @@ dialog.sheet {
     min-height: 44px;
   }
 }
-#draft-error:not(:empty) {
-  margin: var(--s3) var(--s5) 0;
+.actions #draft-error {
+  flex-basis: 100%;
 }
-@media (max-width: 720px) {
-  #draft-error:not(:empty) {
-    margin-left: var(--s4);
-    margin-right: var(--s4);
-  }
+.actions #draft-error:empty {
+  display: none;
 }
