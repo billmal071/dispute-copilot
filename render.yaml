@@ -1,0 +1,24 @@
+# Render Blueprint: hosted demo in mock mode (recorded replay drafts, no PayPal or NVIDIA keys).
+# The app has no login, so never add real credentials to this service.
+services:
+  - type: web
+    name: dispute-copilot
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev
+    startCommand: npm run seed && npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: MODE
+        value: mock
+      - key: LLM_PROVIDER
+        value: replay
+      - key: HOST
+        value: 0.0.0.0
+      - key: DB_PATH
+        value: /tmp/dispute-copilot.db
+      # Set to this service's hostname (for example dispute-copilot.onrender.com) after the first deploy.
+      - key: ALLOWED_HOSTS
+        value: dispute-copilot.onrender.com
