@@ -210,7 +210,7 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
       return c.json({ error: "Request blocked: unrecognised host" }, 403);
     c.header("x-content-type-options", "nosniff");
     c.header("x-frame-options", "DENY");
-    c.header("referrer-policy", "no-referrer");
+    c.header("referrer-policy", "same-origin");
     c.header("content-security-policy", CSP);
     await next();
     if (c.res.headers.get("content-type")?.includes("text/html"))

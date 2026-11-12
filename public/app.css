@@ -2732,4 +2732,18 @@ dialog.sheet {
     padding-top: 10px;
     padding-bottom: 10px;
   }
+  .verify a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+#draft-error:not(:empty) {
+  margin: var(--s3) var(--s5) 0;
+}
+@media (max-width: 720px) {
+  #draft-error:not(:empty) {
+    margin-left: var(--s4);
+    margin-right: var(--s4);
+  }
 }
