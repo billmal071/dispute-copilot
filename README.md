@@ -21,6 +21,7 @@ Requires Node 24. With `MODE=mock` (default) everything runs offline on 13 seede
 
 1. In the PayPal developer dashboard create a sandbox **Merchant** app with "Customer disputes" enabled, and note its client ID and secret. You also need sandbox buyer and merchant accounts and a dispute (buyer opens a case against the merchant from a US sandbox account).
 2. Put the credentials in `.env` (never commit it):
+
    ```
    MODE=sandbox
    PAYPAL_CLIENT_ID=...
