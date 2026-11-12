@@ -2324,7 +2324,7 @@ dialog.sheet form {
   align-items: center;
   gap: var(--s3);
 }
-.fact-due dd span {
+.fact-due .due-text {
   display: flex;
   flex-direction: column;
   line-height: 1.25;
@@ -2670,4 +2670,14 @@ dialog.sheet {
 .facts .fact-status {
   grid-column: 1 / -1;
   border-right: 0;
+}
+.callout.irreversible > .i {
+  color: var(--stamp);
+}
+.draft-top {
+  flex-wrap: wrap;
+}
+.draft-top .chip {
+  max-width: 100%;
+  white-space: normal;
 }

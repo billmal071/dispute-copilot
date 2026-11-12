@@ -531,7 +531,7 @@ export function draftPanel(
       ? h`<div class="callout error">${icon.alert}<div><strong>Grounding warnings</strong><ul>${s.warnings.map((w) => h`<li>${w}</li>`)}</ul></div></div>`
       : ""
   }
-  ${(d.flags ?? []).map((f) => h`<div class="callout warn">${icon.flag}<div><strong>Flagged:</strong> ${f}</div></div>`)}
+  ${(d.flags ?? []).map((f) => h`<div class="callout warn">${icon.flag}<div><strong>Flagged:</strong> ${plainWords(f)}</div></div>`)}
   <div class="actions">
     <button class="btn primary big" type="submit">Review &amp; approve${icon.arrow}<span class="spinner htmx-indicator" aria-hidden="true"></span></button>
     <button class="btn danger" type="button" hx-post="/drafts/${draft.id}/reject" hx-vals='${JSON.stringify({ idempotency_key: `${ctx.idempotencyKey}-reject` })}' hx-target="#draft-panel" hx-swap="outerHTML" hx-confirm="Reject this draft? Nothing will be sent to PayPal.">Reject</button>
@@ -539,7 +539,7 @@ export function draftPanel(
   </div>
   <div class="details-stack">
     <h3 class="details-h">Details</h3>
-    ${detailSection("Why the agent decided this", firstSentence(d.reasoning, 80), reasoningBody)}
+    ${detailSection("Why the agent decided this", plainWords(firstSentence(d.reasoning, 80)), reasoningBody)}
     ${detailSection("Edit what gets sent", editSummary, editBody)}
     ${detailSection("Evidence ledger", h`<b class="have">${count("have")}</b> have <b class="weak">${count("weak")}</b> weak <b class="missing">${count("missing")}</b> missing`, ledgerBody)}
     ${detailSection("Score breakdown", contest ? h`Evidence score <b class="tnum">${draft.score}</b> / 100` : "Evidence score: n/a, not contesting", scoreBody)}
@@ -593,7 +593,7 @@ export function detailPage(ev: EvidenceView, panel: Safe, now: Date): Safe {
   <dl class="facts">
     <div><dt>Amount</dt><dd class="tnum">${money(d.dispute_amount)}</dd></div>
     <div><dt>Buyer</dt><dd>${buyer ?? "Unknown"}</dd></div>
-    <div class="fact-due ${due.tone}"><dt>Respond by</dt><dd>${deadlineRingView(deadlineRing(d.seller_response_due_date, now), "lg")}<span><b>${due.text}</b><small>${dateFmt(d.seller_response_due_date)}</small></span></dd></div>
+    <div class="fact-due ${due.tone}"><dt>Respond by</dt><dd>${deadlineRingView(deadlineRing(d.seller_response_due_date, now), "lg")}<span class="due-text"><b>${due.text}</b><small>${dateFmt(d.seller_response_due_date)}</small></span></dd></div>
     <div class="fact-status"><dt>PayPal status</dt><dd>${statusChip(d.status)}</dd></div>
   </dl>
 </header>
