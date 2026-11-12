@@ -2,7 +2,7 @@
 
 An AI copilot for small merchants that investigates a PayPal dispute, drafts the evidence response, scores it, and sends nothing until a human approves.
 
-Status: slice 1 (skeleton, mock and sandbox clients, agent, approval gate, audit chain, UI). Screenshots, the baseline comparison and the demo video come later.
+Status: working demo for the PayPal AI Hackathon. Mock mode runs offline; sandbox mode has been exercised against the real PayPal sandbox for read, provide-evidence and accept-claim (see `docs/unverified.md` for what is still untested). Submission write-up: `docs/SUBMISSION.md`.
 
 ## Quick start (no credentials)
 
@@ -15,7 +15,22 @@ npm start
 # open http://localhost:3000
 ```
 
-Requires Node 24. With `MODE=mock` (default) everything runs offline on 13 seeded disputes. Without `ANTHROPIC_API_KEY` the agent uses a scripted demo fixture from `fixtures/llm-cache`, not real Claude output; the UI labels these drafts "Scripted demo fixture". Mock mode uses a fixed demo clock (`DEMO_NOW`) so replayed inputs stay identical.
+Requires Node 24. With `MODE=mock` (default) everything runs offline on 13 seeded disputes and needs no keys. With no model key the agent replays recorded drafts: real NVIDIA-model output first (`fixtures/llm-cache-nvidia`, labelled "Recorded real model output"), then hand-written scripted fixtures (`fixtures/llm-cache`, labelled "Scripted demo fixture"). Every draft shows which one it is. Mock mode uses a fixed demo clock (`DEMO_NOW`) so replayed inputs stay identical.
+
+## Run against the PayPal sandbox
+
+1. In the PayPal developer dashboard create a sandbox **Merchant** app with "Customer disputes" enabled, and note its client ID and secret. You also need sandbox buyer and merchant accounts and a dispute (buyer opens a case against the merchant from a US sandbox account).
+2. Put the credentials in `.env` (never commit it):
+   ```
+   MODE=sandbox
+   PAYPAL_CLIENT_ID=...
+   PAYPAL_CLIENT_SECRET=...
+   DB_PATH=data/sandbox.db    # keep sandbox data apart from the mock database
+   # optional live model: NVIDIA_API_KEY=... with LLM_PROVIDER=nvidia
+   ```
+3. `npm start`, open http://127.0.0.1:3000 and press **Sync now**. Open a dispute, **Draft a response**, then **Review & approve**. The sheet shows the exact request. **Approve & send** makes a real write to the sandbox and cannot be undone.
+
+The server binds to `127.0.0.1` and rejects other `Host` headers (DNS-rebinding guard). If you must use another hostname, list it in `ALLOWED_HOSTS` (comma separated).
 
 ## Interface
 
