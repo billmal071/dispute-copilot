@@ -652,8 +652,19 @@ main {
   transform: translateX(3px);
   color: var(--ink);
 }
-.case.settled {
-  opacity: 0.72;
+.case.settled .case-link,
+.case.settled .case-amount,
+.case.settled .state,
+.case.settled .due-words,
+.case.settled .win,
+.case.settled .win b {
+  color: var(--muted);
+  opacity: 1;
+}
+.case.settled .chip {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--rule-2);
 }
 .rank {
   font-family: var(--mono);
@@ -851,6 +862,10 @@ main {
   flex-direction: column;
   align-items: center;
   gap: var(--s3);
+}
+.panel.empty h1 {
+  font-size: 1.65rem;
+  line-height: 1.1;
 }
 .panel.empty p {
   color: var(--ink-2);
@@ -1413,6 +1428,10 @@ mark.hl {
 .part.pen .pts,
 .part.pen .part-head span:first-child {
   color: var(--stamp);
+}
+.reasoning,
+.understood {
+  overflow-wrap: anywhere;
 }
 .reasoning {
   font-family: var(--serif);
@@ -2227,6 +2246,9 @@ dialog.sheet form {
   .steps li {
     opacity: 1;
   }
+  dialog.sheet::backdrop {
+    animation: none !important;
+  }
 }
 @media print {
   .topbar,
@@ -2680,4 +2702,34 @@ dialog.sheet {
 .draft-top .chip {
   max-width: 100%;
   white-space: normal;
+}
+dialog.sheet {
+  max-width: none;
+}
+@media (max-width: 640px) {
+  .nav a,
+  .icon-btn,
+  .brand,
+  .btn,
+  .case-link,
+  .crumb,
+  summary,
+  .ev-link,
+  .head-actions .btn {
+    min-height: 44px;
+  }
+  .nav a,
+  .brand,
+  .crumb,
+  .ev-link {
+    display: inline-flex;
+    align-items: center;
+  }
+  .icon-btn {
+    min-width: 44px;
+  }
+  .btn {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
 }

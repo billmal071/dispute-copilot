@@ -69,6 +69,9 @@ export const statusChip = (status: string): Safe => {
   return h`<span class="chip ${s.tone}">${s.label}</span>`;
 };
 
+export const statusCard = (status: string, oob = false): Safe =>
+  h`<div class="fact-status" id="fact-status" ${oob ? raw('hx-swap-oob="true"') : ""}><dt>PayPal status</dt><dd>${statusChip(status)}</dd></div>`;
+
 export const money = (m: { currency_code: string; value: string }): string =>
   formatMoney(Number(m.value), m.currency_code);
 
@@ -246,8 +249,17 @@ function caseRow(r: RankedRow, now: Date): Safe {
 </li>`;
 }
 
-export function inboxPage(rows: InboxRow[], now: Date, mode: "mock" | "sandbox"): Safe {
-  const head = (action: Safe | "") => h`<div class="page-head">
+export function inboxPage(
+  rows: InboxRow[],
+  now: Date,
+  mode: "mock" | "sandbox",
+  synced?: number,
+): Safe {
+  const flash =
+    synced === undefined
+      ? ""
+      : h`<div class="callout ok flash" role="status">${icon.check}<div>Synced ${synced} ${synced === 1 ? "dispute" : "disputes"} from ${mode === "mock" ? "the mock data" : "PayPal"}.</div></div>`;
+  const head = (action: Safe | "") => h`${flash}<div class="page-head">
     <div><span class="eyebrow">${dateFmt(now.toISOString())}</span><h1>Your disputes</h1></div>
     <div class="head-actions">${action}<form method="post" action="/sync">${csrfInput}<button class="btn ghost" type="submit">${icon.sync}Sync now</button></form></div>
   </div>`;
@@ -291,7 +303,7 @@ ${
 export function notFoundPage(what: string, detail: string): Safe {
   return h`<div class="panel empty">
   <svg class="empty-art" viewBox="0 0 120 96" aria-hidden="true"><rect x="22" y="10" width="76" height="76" rx="8" class="ea-sheet"/><path d="M36 30h48M36 42h48M36 54h30" class="ea-line"/><circle cx="86" cy="70" r="14" class="ea-ring warn"/><path d="M86 63v8M86 76v.5" class="ea-check warn"/></svg>
-  <h2>${what}</h2><p>${detail}</p><a class="btn primary" href="/">${icon.back}Back to inbox</a></div>`;
+  <h1>${what}</h1><p>${detail}</p><a class="btn primary" href="/">${icon.back}Back to inbox</a></div>`;
 }
 
 export interface EvidenceView {
@@ -419,7 +431,8 @@ export function decisionPanel(
     rejected
       ? h`<div class="stamp rejected" role="img" aria-label="Rejected"><span>Rejected</span></div>
       <h2 class="decision-title">Rejected</h2>
-      <p class="lede">Nothing was sent to PayPal. Decided by ${decision.decidedBy} on ${dateTimeFmt(decision.decidedAt)}.</p>`
+      <p class="lede">You rejected this draft. Nothing was sent. Decided by ${decision.decidedBy} on ${dateTimeFmt(decision.decidedAt)}.</p>
+      <button class="btn primary" type="button" hx-post="/disputes/${draft.dispute_id}/draft" hx-target="#draft-panel" hx-swap="outerHTML" hx-disabled-elt="this">Draft again${icon.arrow}</button>`
       : sent
         ? h`<div class="stamp" role="img" aria-label="Sent"><span>Sent</span><small>${modeName(mode)}</small></div>
       <h2 class="decision-title">Sent to PayPal${decision.decision === "edit" ? " with your edits" : ""}</h2>
@@ -443,9 +456,9 @@ function detailSection(
   title: string,
   summary: Safe | string,
   body: Safe,
-  opts: { open?: boolean } = {},
+  opts: { open?: boolean; id?: string } = {},
 ): Safe {
-  return h`<details class="dt" ${opts.open ? raw("open") : ""}><summary><span class="dt-title">${title}</span><span class="dt-sum">${summary}</span></summary><div class="dt-body">${body}</div></details>`;
+  return h`<details class="dt" ${opts.id ? raw(`id="${opts.id}"`) : ""} ${opts.open ? raw("open") : ""}><summary><span class="dt-title">${title}</span><span class="dt-sum">${summary}</span></summary><div class="dt-body">${body}</div></details>`;
 }
 
 export function draftPanel(
@@ -537,10 +550,11 @@ export function draftPanel(
     <button class="btn danger" type="button" hx-post="/drafts/${draft.id}/reject" hx-vals='${JSON.stringify({ idempotency_key: `${ctx.idempotencyKey}-reject` })}' hx-target="#draft-panel" hx-swap="outerHTML" hx-confirm="Reject this draft? Nothing will be sent to PayPal.">Reject</button>
     <p class="hint">You see the exact ${ctx.mode === "mock" ? "(simulated) " : ""}PayPal request before anything is sent.</p>
   </div>
+  <div id="draft-error"></div>
   <div class="details-stack">
     <h3 class="details-h">Details</h3>
     ${detailSection("Why the agent decided this", plainWords(firstSentence(d.reasoning, 80)), reasoningBody)}
-    ${detailSection("Edit what gets sent", editSummary, editBody)}
+    ${detailSection("Edit what gets sent", editSummary, editBody, { id: "edit-details" })}
     ${detailSection("Evidence ledger", h`<b class="have">${count("have")}</b> have <b class="weak">${count("weak")}</b> weak <b class="missing">${count("missing")}</b> missing`, ledgerBody)}
     ${detailSection("Score breakdown", contest ? h`Evidence score <b class="tnum">${draft.score}</b> / 100` : "Evidence score: n/a, not contesting", scoreBody)}
     ${detailSection("Tool trace", `${draft.trace.length} tool calls`, traceView(draft.trace))}
@@ -594,7 +608,7 @@ export function detailPage(ev: EvidenceView, panel: Safe, now: Date): Safe {
     <div><dt>Amount</dt><dd class="tnum">${money(d.dispute_amount)}</dd></div>
     <div><dt>Buyer</dt><dd>${buyer ?? "Unknown"}</dd></div>
     <div class="fact-due ${due.tone}"><dt>Respond by</dt><dd>${deadlineRingView(deadlineRing(d.seller_response_due_date, now), "lg")}<span class="due-text"><b>${due.text}</b><small>${dateFmt(d.seller_response_due_date)}</small></span></dd></div>
-    <div class="fact-status"><dt>PayPal status</dt><dd>${statusChip(d.status)}</dd></div>
+    ${statusCard(d.status)}
   </dl>
 </header>
 <div class="hero">${panel}</div>
@@ -654,8 +668,8 @@ export function previewDialog(
 <script>(function(){var d=document.getElementById("approval-dialog");if(!d)return;d.addEventListener("click",function(e){if(e.target===d)d.close()});if(!d.open)d.showModal();})();</script>`;
 }
 
-export function errorFragment(message: string): Safe {
-  return h`<div class="callout error" role="alert">${icon.alert}<div>${message}</div></div>`;
+export function errorFragment(message: string, opens?: string): Safe {
+  return h`<div class="callout error" role="alert" ${opens ? raw(`data-opens="${opens}"`) : ""}>${icon.alert}<div>${message}</div></div>`;
 }
 
 export function auditPage(
@@ -663,6 +677,9 @@ export function auditPage(
   chain: ChainResult,
   disputeId: string | undefined,
 ): Safe {
+  const entryCount = disputeId
+    ? `${rows.length} ${rows.length === 1 ? "entry" : "entries"} for ${disputeId} (${chain.length} in the full chain)`
+    : `${chain.length} entries across all disputes`;
   const actorTone: Record<string, string> = {
     agent: "agent",
     human: "human",
@@ -674,7 +691,7 @@ export function auditPage(
 <div class="verify ${chain.ok ? "ok" : "bad"}" role="status">
   <span class="verify-ic">${chain.ok ? icon.shield : icon.alert}</span>
   <div><strong>${chain.ok ? "Hash chain verified" : `Chain broken at entry #${chain.brokenAt}`}</strong>
-  <span>${chain.length} entries across all disputes · <a href="/audit/verify">verify JSON</a></span></div>
+  <span>${entryCount} · <a href="/audit/verify">verify JSON</a></span></div>
 </div>
 ${
   rows.length === 0

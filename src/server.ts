@@ -38,6 +38,7 @@ import {
   noDraftPanel,
   notFoundPage,
   previewDialog,
+  statusCard,
 } from "./web/views.js";
 import { handleWebhook } from "./webhook.js";
 
@@ -312,12 +313,15 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
         decision: decision?.decision ?? null,
       };
     });
-    return c.html(page(c, "inbox", "inbox", inboxPage(rows, ctx.clock.now(), ctx.mode)));
+    const syncedParam = c.req.query("synced");
+    const synced = syncedParam && /^\d{1,6}$/.test(syncedParam) ? Number(syncedParam) : undefined;
+    return c.html(page(c, "inbox", "inbox", inboxPage(rows, ctx.clock.now(), ctx.mode, synced)));
   });
 
   app.post("/sync", async (c) => {
+    let synced = 0;
     try {
-      await syncDisputes(ctx);
+      synced = await syncDisputes(ctx);
     } catch (err) {
       const message = err instanceof PayPalError ? err.message : String(err);
       return c.html(
@@ -334,7 +338,7 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
         502,
       );
     }
-    return c.redirect("/", 303);
+    return c.redirect(`/?synced=${synced}`, 303);
   });
 
   app.get("/disputes/:id", async (c) => {
@@ -458,7 +462,12 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
         }).toString(),
       );
     } catch (err) {
-      if (err instanceof ValidationError) return c.html(errorFragment(err.message).toString(), 422);
+      if (err instanceof ValidationError) {
+        c.header("HX-Retarget", "#draft-error");
+        c.header("HX-Reswap", "innerHTML");
+        const opens = /message/i.test(err.message) ? "edit-details" : undefined;
+        return c.html(errorFragment(err.message, opens).toString(), 422);
+      }
       throw err;
     }
   });
@@ -494,6 +503,7 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
       if (!isHtmx(c)) return c.redirect(`/disputes/${stored.dispute_id}`, 303);
       const decision = loadDecision(ctx, draftId);
       if (!decision) throw new Error("decision missing after approval");
+      const status = localDispute(ctx, stored.dispute_id)?.status;
       return c.html(
         decisionPanel(
           stored,
@@ -501,7 +511,7 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
           ctx.mode,
           outcome.error,
           auditFor(stored.dispute_id),
-        ).toString(),
+        ).toString() + (status ? statusCard(status, true).toString() : ""),
       );
     } catch (err) {
       if (err instanceof ValidationError) {

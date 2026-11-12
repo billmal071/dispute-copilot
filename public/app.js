@@ -8,7 +8,13 @@ document.addEventListener("htmx:beforeSwap", (e) => {
 
 document.addEventListener("htmx:afterSwap", (e) => {
   const target = e.detail.target;
-  if (target && target.id === "modal-slot" && target.querySelector(".callout.error")) {
+  if (!target || !target.querySelector(".callout.error")) return;
+  if (target.id === "draft-error") {
+    const opens = target.querySelector("[data-opens]")?.dataset.opens;
+    const section = opens && document.getElementById(opens);
+    if (section) section.open = true;
+  }
+  if (target.id === "modal-slot" || target.id === "draft-error") {
     target.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 });
@@ -55,3 +61,22 @@ document.addEventListener("htmx:afterSwap", (e) => {
   if (slot) slot.innerHTML = "";
   document.getElementById("draft-panel")?.scrollIntoView({ block: "nearest" });
 });
+
+document.addEventListener("htmx:beforeRequest", (e) => {
+  if (e.target.id === "draft-form") {
+    const slot = document.getElementById("draft-error");
+    if (slot) slot.innerHTML = "";
+  }
+});
+
+document.addEventListener(
+  "close",
+  (e) => {
+    if (e.target.id !== "approval-dialog") return;
+    setTimeout(
+      () => document.querySelector("#draft-form .actions button[type=submit]")?.focus(),
+      0,
+    );
+  },
+  true,
+);
