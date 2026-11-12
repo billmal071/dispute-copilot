@@ -4,7 +4,7 @@ Third-party listings say the video must be public on YouTube and under 3 minutes
 
 ## Which mode, and why
 
-Case PP-R-BVH-10197979 is now UNDER_REVIEW after the write test, so it has no action links and cannot be approved again. Do not use it for the pre-submission state.
+Case PP-R-BVH-10197979 is already UNDER_REVIEW after the first write test, and PP-R-BAV-10198876 after the accept-claim recorded in the demo video, so it has no action links and cannot be approved again. Do not use it for the pre-submission state.
 
 - Shots 1-3 (inbox, case, draft): `MODE=sandbox` on a fresh sandbox dispute (steps below). This shows a real PayPal read.
 - Shot 4 (approve): do it on the fresh dispute only if you accept a second real write (tracking number is a labelled placeholder). Otherwise approve in `MODE=mock`.

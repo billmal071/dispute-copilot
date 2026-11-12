@@ -40,7 +40,7 @@ Verified against the real PayPal sandbox on 2026-11-10 (from `docs/unverified.md
 Not verified (do not claim as working against PayPal):
 
 - Provide-evidence with file uploads (a multipart attempt was rejected with 400; cause unknown).
-- accept-claim, make-offer, send-message, sandbox require-evidence and adjudicate writes. They run in mock mode only.
+- make-offer, send-message, sandbox require-evidence and adjudicate writes. They run in mock mode only. (provide-evidence and accept-claim have both been run against the real sandbox.)
 - Webhook signature verification via `/v1/notifications/verify-webhook-signature`.
 - Whether PayPal deduplicates on `PayPal-Request-Id` for dispute endpoints (a different id was used after each 400; repeat-id dedup untested).
 - Mapping of buyer id, tracker data and refunds on real data beyond the one dispute; mock error codes are plausible, not copied from PayPal.
@@ -64,7 +64,7 @@ Not verified (do not claim as working against PayPal):
 
 - Run the agent against a live Claude model and publish real eval numbers with a baseline.
 - Read PayPal's requested evidence types and constrain drafts to them.
-- Verify and fix file upload, accept-claim, make-offer and webhook signature against the sandbox.
+- Verify and fix file upload, make-offer and webhook signature against the sandbox.
 - Carrier lookups for delivery verification; authentication and multi-merchant support.
 
 ## Judging-criteria mapping

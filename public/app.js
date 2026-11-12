@@ -6,6 +6,13 @@ document.addEventListener("htmx:beforeSwap", (e) => {
   }
 });
 
+document.addEventListener("htmx:afterSwap", (e) => {
+  const target = e.detail.target;
+  if (target && target.id === "modal-slot" && target.querySelector(".callout.error")) {
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+});
+
 const root = document.documentElement;
 const prefersDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
 const currentTheme = () => root.dataset.theme || (prefersDark() ? "dark" : "light");

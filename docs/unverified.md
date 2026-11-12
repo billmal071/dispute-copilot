@@ -11,6 +11,7 @@ All isolated in `src/paypal/real.ts` and `src/paypal/mappers.ts`. Items under "C
 
 - Token scopes: the app's client-credentials token carries `disputes/update-seller` and `provide-evidence` succeeded with it.
 - provide-evidence without files: `POST /v1/customer/disputes/{id}/provide-evidence` with `Content-Type: application/json` and body `{evidences:[{evidence_type, notes, evidence_info:{tracking_info:[{carrier_name, carrier_name_other, tracking_number}]}}]}` returned 200 `{"status":"SUBMITTED"}`. The dispute moved WAITING_FOR_SELLER_RESPONSE to UNDER_REVIEW and the `provide_evidence`, `accept_claim`, `make_offer`, `escalate` and `send_message` links disappeared.
+- accept-claim: `POST /v1/customer/disputes/{id}/accept-claim` with body `{note, accept_claim_reason: "REASON_NOT_SET"}` returned HTTP 200 `status: SUBMITTED` on a real sandbox credit-not-processed chargeback (PP-R-BAV-10198876, 2026-11-12); a follow-up GET showed `UNDER_REVIEW`.
 - For a MERCHANDISE_OR_SERVICE_NOT_RECEIVED inquiry that requested PROOF_OF_FULFILLMENT, evidence type `OTHER` was rejected with 400 `INVALID_REQUEST` / `EVIDENCE_TYPE_IS_NOT_ALLOWED`. A multipart request whose `input` part was sent by Node's FormData (with a filename) was also rejected with 400 `INVALID_REQUEST`; the detail was not captured, so the cause (filename or evidence type) is unknown.
 - `PayPal-Request-Id` on provide-evidence: sent on every attempt; a different id was used after each 400 and no duplicate evidence resulted. Deduplication on a repeated id was not tested.
 
@@ -21,12 +22,12 @@ All isolated in `src/paypal/real.ts` and `src/paypal/mappers.ts`. Items under "C
 - Transaction is assembled from `GET /v2/payments/captures/{id}` plus the order (`supplementary_data.related_ids.order_id`); refunds come from `purchase_units[0].payments.refunds`.
 - Tracking: `GET /v1/shipping/trackers?transaction_id=`; PayPal trackers carry no delivery time, signature or delivery address, so delivery verification will not pass in sandbox until a carrier lookup exists.
 - provide-evidence with files: multipart with a JSON part named `input` and files as `evidence-file`. Not exercised; the JSON-only path is confirmed.
-- accept-claim body `accept_claim_reason` enum values; make-offer body shape.
+- accept-claim `accept_claim_reason` values other than `REASON_NOT_SET`; make-offer body shape.
 - require-evidence `{action: "SELLER_EVIDENCE"}` and adjudicate `{adjudication_outcome}` bodies.
 - Webhook verification via `POST /v1/notifications/verify-webhook-signature`.
 - Mock error codes (for example `DISPUTE_STATUS_NOT_VALID`) are plausible, not copied from PayPal.
 - `PayPal-Request-Id` honoured on dispute endpoints (provide-evidence, accept-claim, make-offer): the in-flight claim and retry-under-same-key design assume PayPal deduplicates on it for these calls.
-- Write endpoints other than provide-evidence (accept-claim, make-offer, send-message, require-evidence, adjudicate) have not been called against the real sandbox.
+- Write endpoints other than provide-evidence and accept-claim (make-offer, send-message, require-evidence, adjudicate) have not been called against the real sandbox.
 - Dispute `evidences[]` entries with `source: REQUESTED_FROM_SELLER` list the evidence types PayPal accepts; the app does not read them yet, so a draft can still choose a type PayPal rejects with `EVIDENCE_TYPE_IS_NOT_ALLOWED`.
 - Tracker carriers from PayPal are already carrier codes; a free-text carrier is sent as `OTHER` plus `carrier_name_other`, which was accepted once with a placeholder carrier.
 - A tracker that does exist for a transaction: the real sandbox returned none, so tracker mapping is untested against real data.
