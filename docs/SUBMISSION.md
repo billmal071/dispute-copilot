@@ -71,17 +71,23 @@ Not verified (do not claim as working against PayPal):
 
 Criteria as listed by third-party sources: technical implementation, design, potential impact, innovation, presentation. Confirm against the official rules.
 
-| Criterion                | Evidence                                                                                                                                                               |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Technical implementation | Compile-time read/write split, CSRF plus draft-version-bound approval, atomic in-flight claim, hash-chained anchored audit, 197 tests, real sandbox read and one write |
-| Design                   | Four-view flow (inbox, case file, evidence ledger, approval sheet showing the exact outbound request), self-hosted fonts and icons, explicit fixture labels            |
-| Potential impact         | Disputes are a real merchant chore; the approval gate keeps the merchant in control. No quantified impact claimed                                                      |
-| Innovation               | Grounded-citation rule, deterministic evidence score, prompt-injection handling for buyer messages, tamper-evident audit                                               |
-| Presentation             | 2:40 video, README, `docs/unverified.md` listing exactly what is and is not verified                                                                                   |
+| Criterion                | Evidence                                                                                                                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Technical implementation | Compile-time read/write split, CSRF plus draft-version-bound approval, atomic in-flight claim, hash-chained anchored audit, 274 tests, real sandbox reads and two writes (provide-evidence, accept-claim) |
+| Design                   | Four-view flow (inbox, case file, evidence ledger, approval sheet showing the exact outbound request), self-hosted fonts and icons, explicit fixture labels                                               |
+| Potential impact         | Disputes are a real merchant chore; the approval gate keeps the merchant in control. No quantified impact claimed                                                                                         |
+| Innovation               | Grounded-citation rule, deterministic evidence score, prompt-injection handling for buyer messages, tamper-evident audit                                                                                  |
+| Presentation             | 2:14 video of a real sandbox run, hosted mock-mode demo, README, `docs/unverified.md` listing exactly what is and is not verified                                                                         |
 
 ## Built with
 
-Node 24, TypeScript, Hono, htmx, SQLite (better-sqlite3), Vitest, Biome, Anthropic SDK (`claude-sonnet-5-5`, unused in the demo), PayPal Disputes, Payments and Shipping Trackers APIs.
+Node 24, TypeScript, Hono, htmx, SQLite (better-sqlite3), Vitest, Biome, NVIDIA API (`nvidia/nemotron-3.5-lightning-30b-a3b`), Anthropic SDK (`claude-sonnet-5-5`, never run live), Render, PayPal Disputes, Payments and Shipping Trackers APIs.
+
+## Final links
+
+- Video (2:14, real sandbox run on PP-R-QEB-10200184, live NVIDIA draft, real accept-claim): https://youtu.be/DhZ5vYyHlp8
+- Hosted demo (Render free tier, mock mode with recorded drafts, no PayPal or NVIDIA keys; first load after idle takes about 50 seconds): https://dispute-copilot-flq6.onrender.com
+- Repo (MIT): https://github.com/billmal071/dispute-copilot
 
 ## Final checklist before submitting (user)
 
