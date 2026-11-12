@@ -1,4 +1,11 @@
-import type { Dispute, DisputeReason, EvidenceDraft, EvidenceType, ToolRun } from "../types.js";
+import {
+  claimedTracking,
+  type Dispute,
+  type DisputeReason,
+  type EvidenceDraft,
+  type EvidenceType,
+  type ToolRun,
+} from "../types.js";
 import { deriveFacts, dueAt } from "./facts.js";
 
 export interface ScorePart {
@@ -59,14 +66,15 @@ export function scoreDraft({ dispute, draft, toolRuns, now }: ScoreInput): Score
       if (!facts.knownRefs.has(ref))
         unsupported.push(`citation "${ref}" was not returned by any tool`);
     }
-    if (ev.tracking) {
+    const claimed = claimedTracking(ev);
+    if (claimed) {
       const seen = toolRuns.some(
         (r) =>
           r.name === "get_tracking" &&
-          (r.output as { tracking_number?: string }).tracking_number === ev.tracking?.number,
+          (r.output as { tracking_number?: string }).tracking_number === claimed.number,
       );
       if (!seen)
-        unsupported.push(`tracking number "${ev.tracking.number}" was not returned by any tool`);
+        unsupported.push(`tracking number "${claimed.number}" was not returned by any tool`);
     }
     for (const id of ev.refund_ids ?? []) {
       if (!facts.transaction?.refunds.some((r) => r.id === id)) {
@@ -81,7 +89,7 @@ export function scoreDraft({ dispute, draft, toolRuns, now }: ScoreInput): Score
     draft.evidences.some(
       (e) =>
         e.evidence_type === type &&
-        (type !== "PROOF_OF_FULFILLMENT" || !!e.tracking || facts.hasAccessLogs),
+        (type !== "PROOF_OF_FULFILLMENT" || !!claimedTracking(e) || facts.hasAccessLogs),
     ),
   );
   const requiredPoints = Math.round((30 * satisfied.length) / required.length);

@@ -119,6 +119,9 @@ export const EvidenceItem = z.object({
 });
 export type EvidenceItem = z.infer<typeof EvidenceItem>;
 
+export const claimedTracking = (e: EvidenceItem) =>
+  e.tracking && e.tracking.number.trim() !== "" ? e.tracking : undefined;
+
 export const OfferType = z.enum([
   "REFUND",
   "REFUND_WITH_RETURN",

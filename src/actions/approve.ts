@@ -9,7 +9,7 @@ import {
   type PayPalWriteClient,
   type ProvideEvidenceRequest,
 } from "../paypal/client.js";
-import { type Dispute, EvidenceDraft } from "../types.js";
+import { claimedTracking, type Dispute, EvidenceDraft } from "../types.js";
 
 export interface ApprovalDeps {
   db: Db;
@@ -66,12 +66,14 @@ function trackingInfo(t: { carrier: string; number: string }) {
 }
 
 export function buildPayload(dispute: Dispute, draft: EvidenceDraft): Payload {
-  const note = (draft.merchant_message ?? "").trim().slice(0, MAX_NOTES);
+  const note = (draft.merchant_message ?? "").trim();
   const requireNote = () => {
     if (note.length === 0)
       throw new ValidationError(
         "Write a message to PayPal before approving. The agent's internal reasoning is never sent.",
       );
+    if (note.length > MAX_NOTES)
+      throw new ValidationError(`Message to PayPal must be 1 to ${MAX_NOTES} characters.`);
   };
   switch (draft.recommendation) {
     case "CONTEST": {
@@ -85,22 +87,21 @@ export function buildPayload(dispute: Dispute, draft: EvidenceDraft): Payload {
       return {
         kind: "provide-evidence",
         request: {
-          evidences: draft.evidences.map((e) => ({
-            evidence_type: e.evidence_type,
-            notes: e.notes,
-            ...(e.tracking || e.refund_ids?.length
-              ? {
-                  evidence_info: {
-                    ...(e.tracking
-                      ? {
-                          tracking_info: [trackingInfo(e.tracking)],
-                        }
-                      : {}),
-                    ...(e.refund_ids?.length ? { refund_ids: e.refund_ids } : {}),
-                  },
-                }
-              : {}),
-          })),
+          evidences: draft.evidences.map((e) => {
+            const tracking = claimedTracking(e);
+            return {
+              evidence_type: e.evidence_type,
+              notes: e.notes,
+              ...(tracking || e.refund_ids?.length
+                ? {
+                    evidence_info: {
+                      ...(tracking ? { tracking_info: [trackingInfo(tracking)] } : {}),
+                      ...(e.refund_ids?.length ? { refund_ids: e.refund_ids } : {}),
+                    },
+                  }
+                : {}),
+            };
+          }),
         },
       };
     }
@@ -240,11 +241,9 @@ async function execute(
     db.prepare(
       "UPDATE actions SET status = 'ok', response_json = ? WHERE id = ? AND status = 'in_flight'",
     ).run(JSON.stringify(response), action.id);
-    db.prepare("UPDATE disputes SET status = ?, updated_at = ? WHERE paypal_id = ?").run(
-      response.status,
-      ts(),
-      disputeId,
-    );
+    db.prepare(
+      "UPDATE disputes SET status = ?, updated_at = ?, raw_json = json_set(raw_json, '$.status', ?) WHERE paypal_id = ?",
+    ).run(response.status, ts(), response.status, disputeId);
     appendAudit(db, {
       actor: "paypal",
       event: "outbound_response",
@@ -305,8 +304,9 @@ export async function approveDraft(
     .prepare("SELECT * FROM approvals WHERE idempotency_key = ?")
     .get(input.idempotencyKey) as ApprovalRow | undefined;
   if (prior) {
-    if (prior.draft_id !== input.draftId || prior.decision === "reject")
-      throw new AlreadyDecidedError(input.draftId);
+    if (prior.draft_id !== input.draftId)
+      throw new ValidationError("That request key was already used for a different draft.");
+    if (prior.decision === "reject") throw new AlreadyDecidedError(input.draftId);
     const action = actionFor(db, prior.id);
     if (action.status === "ok") {
       return {
@@ -344,7 +344,11 @@ export async function approveDraft(
 
   const parsedEdit = input.edited ? EvidenceDraft.safeParse(input.edited) : null;
   if (parsedEdit && !parsedEdit.success)
-    throw new ValidationError(`Edited draft is invalid: ${parsedEdit.error.message}`);
+    throw new ValidationError(
+      parsedEdit.error.issues.some((i) => i.path.includes("notes"))
+        ? `Evidence notes must be 1 to ${MAX_NOTES} characters.`
+        : "The edited draft is not valid. Reload the page and review it again.",
+    );
   const edited = parsedEdit?.data;
   const effective = edited ?? draft.draft;
   const payload = buildPayload(loadDispute(db, disputeId), effective);

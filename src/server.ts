@@ -2,6 +2,7 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { getCookie, setCookie } from "hono/cookie";
 import {
   AlreadyDecidedError,
@@ -119,11 +120,43 @@ export function applyEdits(
   return { edited, changed };
 }
 
-function passthroughFields(form: Record<string, unknown>): Record<string, string> {
+function passthroughFields(
+  form: Record<string, unknown>,
+  evidenceCount: number,
+): Record<string, string> {
+  const wanted = (k: string) => {
+    const note = /^note_(\d+)$/.exec(k);
+    return note ? Number(note[1]) < evidenceCount : k === "merchant_message";
+  };
   return Object.fromEntries(
-    Object.entries(form).filter(
-      ([k, v]) => (/^note_\d+$/.test(k) || k === "merchant_message") && typeof v === "string",
-    ) as [string, string][],
+    Object.entries(form).filter(([k, v]) => wanted(k) && typeof v === "string") as [
+      string,
+      string,
+    ][],
+  );
+}
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+const MAX_BODY_BYTES = 64 * 1024;
+const CSP = "frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+
+export interface ServerOptions {
+  allowedHosts?: string[];
+}
+
+export function hostsFromEnv(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((v) => v.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hostAllowed(hostHeader: string | undefined, extra: string[]): boolean {
+  if (!hostHeader) return false;
+  const host = hostHeader.toLowerCase();
+  const hostname = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
+  return (
+    LOOPBACK_HOSTS.has(hostname ?? "") || extra.includes(host) || extra.includes(hostname ?? "")
   );
 }
 
@@ -148,8 +181,9 @@ function csrfGuard(secret: Buffer) {
 
 export type Server = Hono<{ Variables: { csrf: string } }>;
 
-export function createServer(ctx: AppContext): Server {
+export function createServer(ctx: AppContext, options: ServerOptions = {}): Server {
   const app: Server = new Hono();
+  const extraHosts = options.allowedHosts ?? hostsFromEnv(process.env.ALLOWED_HOSTS);
   const csrf = csrfGuard(randomBytes(32));
   const page = (
     c: { get(key: "csrf"): string },
@@ -170,6 +204,24 @@ export function createServer(ctx: AppContext): Server {
     );
   const auditFor = (disputeId: string) => listAudit(ctx.db, disputeId).slice(-3);
 
+  app.use("*", async (c, next) => {
+    if (c.req.path !== "/webhooks/paypal" && !hostAllowed(new URL(c.req.url).host, extraHosts))
+      return c.json({ error: "Request blocked: unrecognised host" }, 403);
+    c.header("x-content-type-options", "nosniff");
+    c.header("x-frame-options", "DENY");
+    c.header("referrer-policy", "no-referrer");
+    c.header("content-security-policy", CSP);
+    await next();
+    if (c.res.headers.get("content-type")?.includes("text/html"))
+      c.res.headers.set("cache-control", "no-store");
+  });
+  app.use(
+    "*",
+    bodyLimit({
+      maxSize: MAX_BODY_BYTES,
+      onError: (c) => c.json({ error: "Request body too large" }, 413),
+    }),
+  );
   app.use("*", async (c, next) => {
     const existing = getCookie(c, CSRF_COOKIE);
     const token = csrf.valid(existing) ? existing : csrf.mint();
@@ -400,7 +452,7 @@ export function createServer(ctx: AppContext): Server {
           mode: ctx.mode,
           idempotencyKey: randomUUID(),
           edits: changed,
-          fields: passthroughFields(form),
+          fields: passthroughFields(form, stored.draft.evidences.length),
           amount: dispute.dispute_amount,
           buyer: dispute.disputed_transactions[0]?.buyer.name ?? null,
         }).toString(),

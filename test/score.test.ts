@@ -211,3 +211,13 @@ describe("scoreDraft contradiction scope", () => {
     expect(r.penalties).toEqual([]);
   });
 });
+
+describe("empty tracking object", () => {
+  it("is treated as no tracking claim, with no bogus grounding warning", () => {
+    const d = draft();
+    if (d.evidences[0]) d.evidences[0].tracking = { carrier: "", number: "" };
+    const r = scoreDraft({ ...base(), draft: d });
+    expect(r.warnings.filter((w) => w.includes("tracking number"))).toEqual([]);
+    expect(r.penalties.map((p) => p.key)).not.toContain("unsupported_claim");
+  });
+});

@@ -356,3 +356,86 @@ describe("concurrent submission", () => {
     expect(action.response_json).not.toContain("PAYPAL_UNAVAILABLE");
   });
 });
+
+describe("validation messages", () => {
+  const deps = (app: Awaited<ReturnType<typeof makeApp>>) => ({
+    db: app.db,
+    writer: app.writer,
+    clock: app.clock,
+  });
+
+  it("explains an empty evidence note in plain words, never zod internals", async () => {
+    const { app, draft: stored } = await drafted("PP-D-1001");
+    const edited = structuredClone(stored.draft);
+    const first = edited.evidences[0];
+    if (first) first.notes = "";
+    const err = await approveDraft(deps(app), {
+      draftId: stored.id,
+      idempotencyKey: "empty",
+      edited,
+      ...decider,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.message).toBe("Evidence notes must be 1 to 2000 characters.");
+    expect(err.status).toBe(422);
+  });
+
+  it("says the key belongs to another draft instead of claiming a decision exists", async () => {
+    const a = await drafted("PP-D-1001");
+    const b = await createDraft(a.app, "PP-D-1002");
+    if (b.state !== "ok") throw new Error(b.error);
+    await approveDraft(deps(a.app), { draftId: a.draft.id, idempotencyKey: "shared", ...decider });
+    const err = await approveDraft(deps(a.app), {
+      draftId: b.draft.id,
+      idempotencyKey: "shared",
+      ...decider,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.message).toBe("That request key was already used for a different draft.");
+  });
+
+  it("refuses a message to PayPal over 2000 characters instead of truncating it", () => {
+    const accept = draft({
+      recommendation: "ACCEPT",
+      evidences: [],
+      merchant_message: "m".repeat(2001),
+    });
+    expect(() => buildPayload(dispute(), accept)).toThrow(
+      "Message to PayPal must be 1 to 2000 characters.",
+    );
+    const ok = buildPayload(dispute(), { ...accept, merchant_message: "m".repeat(2000) });
+    expect(ok.kind).toBe("accept-claim");
+  });
+
+  it("does not send tracking_info for an empty tracking object", () => {
+    const payload = buildPayload(
+      dispute(),
+      draft({
+        evidences: [
+          {
+            evidence_type: "PROOF_OF_FULFILLMENT",
+            notes: "shipped",
+            tracking: { carrier: "", number: "" },
+            source_refs: [],
+          },
+        ],
+      }),
+    );
+    expect(JSON.stringify(payload.request)).not.toContain("tracking_info");
+  });
+});
+
+describe("local dispute status after a send", () => {
+  it("keeps the stored dispute document in step with the status column", async () => {
+    const { app, draft: stored } = await drafted("PP-D-1001");
+    await approveDraft(
+      { db: app.db, writer: app.writer, clock: app.clock },
+      { draftId: stored.id, idempotencyKey: "k-status", ...decider },
+    );
+    const local = row<{ status: string; raw_json: string }>(
+      app.db.prepare("SELECT status, raw_json FROM disputes WHERE paypal_id = 'PP-D-1001'").get(),
+    );
+    expect(JSON.parse(local.raw_json).status).toBe(local.status);
+    expect(local.status).toBe("UNDER_REVIEW");
+  });
+});
