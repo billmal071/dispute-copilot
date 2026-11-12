@@ -8,7 +8,7 @@ document.addEventListener("htmx:beforeSwap", (e) => {
 
 document.addEventListener("htmx:afterSwap", (e) => {
   const target = e.detail.target;
-  if (!target || !target.querySelector(".callout.error")) return;
+  if (!target?.querySelector(".callout.error")) return;
   if (target.id === "draft-error") {
     const opens = target.querySelector("[data-opens]")?.dataset.opens;
     const section = opens && document.getElementById(opens);
