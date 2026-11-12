@@ -19,6 +19,6 @@ services:
         value: 0.0.0.0
       - key: DB_PATH
         value: /tmp/dispute-copilot.db
-      # Set to this service's hostname (for example dispute-copilot.onrender.com) after the first deploy.
+      # Set to this service's hostname (dispute-copilot-flq6.onrender.com) after the first deploy.
       - key: ALLOWED_HOSTS
-        value: dispute-copilot.onrender.com
+        value: dispute-copilot-flq6.onrender.com

@@ -207,7 +207,9 @@ export function createServer(ctx: AppContext, options: ServerOptions = {}): Serv
   const auditFor = (disputeId: string) => listAudit(ctx.db, disputeId).slice(-3);
 
   app.use("*", async (c, next) => {
-    if (c.req.path !== "/webhooks/paypal" && !hostAllowed(new URL(c.req.url).host, extraHosts))
+    // /healthz is exempt so a hosting platform's health check (which uses its own Host) can reach it.
+    const hostExempt = c.req.path === "/webhooks/paypal" || c.req.path === "/healthz";
+    if (!hostExempt && !hostAllowed(new URL(c.req.url).host, extraHosts))
       return c.json({ error: "Request blocked: unrecognised host" }, 403);
     c.header("x-content-type-options", "nosniff");
     c.header("x-frame-options", "DENY");

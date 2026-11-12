@@ -36,6 +36,14 @@ describe("host allow-list (DNS rebinding)", () => {
     expect(res.status).toBe(403);
   });
 
+  it("answers /healthz for any Host so a platform health check can reach it", async () => {
+    const { raw } = await setup();
+    const res = await raw.request("http://10.1.2.3:10000/healthz");
+    expect(res.status).toBe(200);
+    const other = await raw.request("http://10.1.2.3:10000/");
+    expect(other.status).toBe(403);
+  });
+
   it("rejects a GET to a spoofed host", async () => {
     const { raw } = await setup();
     expect((await raw.request("http://rebind.example:3000/")).status).toBe(403);
@@ -50,8 +58,8 @@ describe("host allow-list (DNS rebinding)", () => {
 
   it("accepts a host named in ALLOWED_HOSTS and still rejects others", async () => {
     const { raw } = await setup(["dispute.lan:3000"]);
-    expect((await raw.request("http://dispute.lan:3000/healthz")).status).toBe(200);
-    expect((await raw.request("http://other.lan:3000/healthz")).status).toBe(403);
+    expect((await raw.request("http://dispute.lan:3000/")).status).toBe(200);
+    expect((await raw.request("http://other.lan:3000/")).status).toBe(403);
   });
 
   it("leaves the signature-verified webhook reachable through a tunnel host", async () => {
